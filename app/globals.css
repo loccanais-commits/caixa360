@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==================== FONTE ==================== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ==================== BASE ==================== */
+body {
+  @apply bg-neutral-50 text-neutral-900 antialiased;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* ==================== SCROLLBAR CUSTOMIZADA ==================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-neutral-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-neutral-400;
+}
+
+/* ==================== INPUTS ==================== */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ==================== ANIMAÇÕES ==================== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.3s ease-out;
+}
+
+/* ==================== BOTÃO DE VOZ ==================== */
+.voice-btn {
+  @apply relative;
+}
+
+.voice-btn.recording::before {
+  content: '';
+  @apply absolute inset-0 rounded-full bg-saida;
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+
+/* ==================== GRADIENTE DA LOGO ==================== */
+.gradient-logo {
+  background: linear-gradient(135deg, #06b6d4 0%, #10b981 50%, #8b5cf6 100%);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #06b6d4 0%, #10b981 50%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ==================== CARDS ==================== */
+.card-hover {
+  @apply transition-all duration-200;
+}
+
+.card-hover:hover {
+  @apply shadow-lg -translate-y-0.5;
+}
+
+/* ==================== SIDEBAR ==================== */
+.sidebar-link {
+  @apply flex items-center gap-3 px-4 py-3 rounded-xl text-neutral-600 transition-all duration-200;
+}
+
+.sidebar-link:hover {
+  @apply bg-neutral-100 text-neutral-900;
+}
+
+.sidebar-link.active {
+  @apply bg-primary-50 text-primary-600 font-medium;
+}
+
+/* ==================== TABELA ==================== */
+.table-row {
+  @apply border-b border-neutral-100 transition-colors;
+}
+
+.table-row:hover {
+  @apply bg-neutral-50;
+}
+
+/* ==================== UTILITÁRIOS ==================== */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ==================== NOTIFICAÇÃO BADGE ==================== */
+.notification-badge {
+  @apply absolute -top-1 -right-1 w-5 h-5 bg-saida text-white text-xs font-bold rounded-full flex items-center justify-center;
+  font-size: 10px;
+}
+
+/* ==================== ONBOARDING ==================== */
+.option-card {
+  @apply p-4 border-2 border-neutral-200 rounded-2xl cursor-pointer transition-all duration-200;
+}
+
+.option-card:hover {
+  @apply border-primary-300 bg-primary-50/50;
+}
+
+.option-card.selected {
+  @apply border-primary-500 bg-primary-50 ring-2 ring-primary-500/20;
+}
