@@ -106,7 +106,7 @@ export default function AuthCallbackPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 flex items-center justify-center">
       <div className="text-center">
-        <img src="/logo.png" alt="Caixa360" className="w-16 h-16 mx-auto mb-4 rounded-2xl animate-pulse" />
+        <img src="/logo.svg" alt="Caixa360" className="w-16 h-16 mx-auto mb-4 rounded-2xl animate-pulse" />
         <p className="text-neutral-600">{status}</p>
       </div>
     </div>

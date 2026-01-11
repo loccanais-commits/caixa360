@@ -131,7 +131,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Caixa360" className="w-20 h-20 mx-auto mb-4 rounded-2xl" />
+          <img src="/logo.svg" alt="Caixa360" className="w-20 h-20 mx-auto mb-4 rounded-2xl" />
           <h1 className="text-3xl font-bold gradient-text">Caixa360</h1>
           <p className="text-neutral-500 mt-2">
             Fluxo de caixa inteligente para seu negócio
