@@ -117,9 +117,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 gradient-logo rounded-2xl flex items-center justify-center animate-pulse">
-            <span className="text-white text-2xl font-bold">C</span>
-          </div>
+          <img src="/logo.png" alt="Caixa360" className="w-16 h-16 mx-auto mb-4 rounded-2xl animate-pulse" />
           <p className="text-neutral-600">Carregando...</p>
         </div>
       </div>
@@ -131,7 +129,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src="/logo.svg" alt="Caixa360" className="w-20 h-20 mx-auto mb-4 rounded-2xl" />
+          <img src="/logo.png" alt="Caixa360" className="w-20 h-20 mx-auto mb-4 rounded-2xl" />
           <h1 className="text-3xl font-bold gradient-text">Caixa360</h1>
           <p className="text-neutral-500 mt-2">
             Fluxo de caixa inteligente para seu negócio

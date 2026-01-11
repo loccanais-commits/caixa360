@@ -208,7 +208,7 @@ export default function OnboardingPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 flex items-center justify-center">
         <div className="text-center">
-          <img src="/logo.svg" alt="Caixa360" className="w-16 h-16 mx-auto mb-4 rounded-2xl animate-pulse" />
+          <img src="/logo.png" alt="Caixa360" className="w-16 h-16 mx-auto mb-4 rounded-2xl animate-pulse" />
           <p className="text-neutral-600">Carregando...</p>
         </div>
       </div>
@@ -220,7 +220,7 @@ export default function OnboardingPage() {
       <div className="w-full max-w-2xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <img src="/logo.svg" alt="Caixa360" className="w-16 h-16 mx-auto mb-4 rounded-2xl" />
+          <img src="/logo.png" alt="Caixa360" className="w-16 h-16 mx-auto mb-4 rounded-2xl" />
           <h1 className="text-2xl font-bold text-neutral-900">
             {step < 4 ? 'Vamos personalizar sua experiência!' : `Tudo pronto, ${userName.split(' ')[0]}!`}
           </h1>

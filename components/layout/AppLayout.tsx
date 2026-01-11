@@ -30,8 +30,7 @@ import {
   Bot,
   Send,
   MessageCircle,
-  UserPlus,
-  Tag
+  UserPlus
 } from 'lucide-react';
 
 interface AppLayoutProps {
@@ -44,7 +43,6 @@ const menuItems = [
   { href: '/lancamentos', label: 'Lançamentos', icon: ArrowLeftRight },
   { href: '/fornecedores', label: 'Fornecedores', icon: Package },
   { href: '/contas', label: 'Contas', icon: Calendar, badge: true },
-  { href: '/categorias', label: 'Categorias', icon: Tag },
   { href: '/salario', label: 'Meu Salário', icon: Wallet },
   { href: '/relatorio', label: 'Relatório', icon: FileText },
   { href: '/importar', label: 'Importar', icon: Upload },
@@ -130,7 +128,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-r border-neutral-100">
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-neutral-100">
-          <img src="/logo.svg" alt="Caixa360" className="w-10 h-10 rounded-xl mr-3" />
+          <img src="/logo.png" alt="Caixa360" className="w-10 h-10 rounded-xl mr-3" />
           <span className="font-bold text-xl gradient-text">Caixa360</span>
         </div>
 
@@ -180,7 +178,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           </button>
           
           <div className="flex items-center gap-2">
-            <img src="/logo.svg" alt="Caixa360" className="w-8 h-8 rounded-lg" />
+            <img src="/logo.png" alt="Caixa360" className="w-8 h-8 rounded-lg" />
             <span className="font-bold gradient-text">Caixa360</span>
           </div>
 

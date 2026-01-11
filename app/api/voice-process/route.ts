@@ -16,12 +16,7 @@ export async function POST(request: NextRequest) {
 
     // Preparar lista de fornecedores para o prompt
     const listaFornecedores = fornecedores && fornecedores.length > 0
-      ? `\nFORNECEDORES CADASTRADOS:\n${fornecedores.map((f: any) => `- ${f.nome} (id: ${f.id})`).join('\n')}`
-      : '';
-
-    // Preparar categorias personalizadas
-    const listaCategoriasPersonalizadas = categoriasPersonalizadas && categoriasPersonalizadas.length > 0
-      ? `\nCATEGORIAS PERSONALIZADAS:\n${categoriasPersonalizadas.map((c: any) => `- ${c.nome} (tipo: ${c.tipo})`).join('\n')}`
+      ? `\nFORNECEDORES/CLIENTES CADASTRADOS:\n${fornecedores.map((f: any) => `- ${f.nome} (id: ${f.id})`).join('\n')}`
       : '';
 
     const hoje = new Date().toISOString().split('T')[0];
@@ -37,80 +32,70 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: 'system',
-            content: `Você é um assistente que extrai informações financeiras de texto em português brasileiro.
-A data de hoje é: ${hoje}
+            content: `Você é um assistente financeiro que extrai lançamentos de texto em português brasileiro.
+Data de hoje: ${hoje}
 
-O usuário pode mencionar UMA OU MAIS transações no mesmo áudio. Extraia TODAS.
+REGRA PRINCIPAL: Sempre que o usuário mencionar NOMES DE PESSOAS com valores, cada pessoa = uma transação separada!
 
-Exemplos de múltiplas transações:
-- "paguei 50 reais de luz e 100 de internet" → 2 transações
-- "recebi 500 do cliente e gastei 200 no fornecedor" → 2 transações
-- "paguei 30 de uber, 150 de almoço e 200 para o João" → 3 transações
+EXEMPLOS DE MÚLTIPLAS TRANSAÇÕES:
+1. "Recebi 500 reais, 300 da Débora e 200 da Raíssa"
+   → Resultado: 2 transações
+   [{"tipo":"entrada","valor":300,"descricao":"Recebimento de Débora","categoria":"vendas","data":"${hoje}","fornecedor_nome":"Débora"},
+    {"tipo":"entrada","valor":200,"descricao":"Recebimento de Raíssa","categoria":"vendas","data":"${hoje}","fornecedor_nome":"Raíssa"}]
 
-Para cada transação, extraia:
-- tipo: "entrada" (recebimento, venda, pagamento recebido) ou "saida" (gasto, pagamento feito, despesa, paguei)
-- valor: número decimal (ex: 150.50)
-- descricao: descrição curta do lançamento
-- categoria: uma das categorias abaixo (ou personalizada se existir)
-- data: a data mencionada no formato YYYY-MM-DD (se não mencionar, use hoje: ${hoje})
-- fornecedor_nome: nome do fornecedor SE mencionado
-${listaFornecedores}
-${listaCategoriasPersonalizadas}
+2. "Recebi 20 da Camila e 50 do Wagner por cortar cabelo"
+   → Resultado: 2 transações  
+   [{"tipo":"entrada","valor":20,"descricao":"Corte de cabelo - Camila","categoria":"servicos","data":"${hoje}","fornecedor_nome":"Camila"},
+    {"tipo":"entrada","valor":50,"descricao":"Corte de cabelo - Wagner","categoria":"servicos","data":"${hoje}","fornecedor_nome":"Wagner"}]
 
-DATAS - EXEMPLOS:
-- "dia 10" ou "no dia 10" = mês atual, dia 10
-- "dia 13 de janeiro" = 2025-01-13 (ou 2026-01-13 dependendo do contexto)
-- "amanhã" = dia seguinte a hoje
-- "ontem" = dia anterior a hoje
-- "semana que vem" = adiciona 7 dias
-- se mencionar data futura, use a data mencionada
+3. "Paguei 50 de luz e 100 de internet"
+   → Resultado: 2 transações
+   [{"tipo":"saida","valor":50,"descricao":"Conta de luz","categoria":"energia","data":"${hoje}","fornecedor_nome":null},
+    {"tipo":"saida","valor":100,"descricao":"Conta de internet","categoria":"internet","data":"${hoje}","fornecedor_nome":null}]
+
+4. "Gastei 30 no mercado e 45 de gasolina"
+   → Resultado: 2 transações
+   [{"tipo":"saida","valor":30,"descricao":"Compras no mercado","categoria":"outros_despesas","data":"${hoje}","fornecedor_nome":null},
+    {"tipo":"saida","valor":45,"descricao":"Combustível","categoria":"transporte","data":"${hoje}","fornecedor_nome":null}]
+
+QUANDO SEPARAR EM MÚLTIPLAS TRANSAÇÕES:
+- Quando mencionar diferentes pessoas com valores (Débora 300, Raíssa 200)
+- Quando usar "e" conectando itens diferentes (luz e internet)
+- Quando o total = soma das partes (500 = 300 + 200)
 
 CATEGORIAS DE ENTRADA:
-- vendas: vendas de produtos ou serviços
-- servicos: prestação de serviços
-- freela_entrada: trabalhos freelance, jobs avulsos
+- vendas: vendas de produtos
+- servicos: prestação de serviços (corte cabelo, manicure, etc)
+- freela_entrada: trabalhos freelance
 - outros_receitas: outras receitas
 
 CATEGORIAS DE SAÍDA:
-- fornecedores: pagamento a fornecedores (quando NÃO menciona fornecedor específico)
-- assinaturas: assinaturas de software, serviços recorrentes (Adobe, Netflix, etc)
-- freela_saida: pagamento a freelancers/terceiros
-- aluguel: aluguel
-- energia: conta de luz/energia
-- agua: conta de água
-- internet: internet/telefone
-- salarios: salários/funcionários
-- impostos: impostos/DAS
-- marketing: marketing/divulgação
-- transporte: transporte/combustível/uber
-- manutencao: manutenção
-- equipamentos: equipamentos
-- prolabore: retirada pessoal/pró-labore
-- outros_despesas: outras despesas
+- fornecedores: pagamento a fornecedores
+- assinaturas: software, serviços recorrentes
+- aluguel, energia, agua, internet: contas fixas
+- salarios: funcionários
+- impostos: DAS, tributos
+- marketing: divulgação
+- transporte: uber, combustível
+- manutencao, equipamentos
+- prolabore: retirada pessoal
+- outros_despesas: outros gastos
+${listaFornecedores}
 
-RESPONDA APENAS COM JSON VÁLIDO. Se for UMA transação:
-{"tipo": "entrada|saida", "valor": 0.00, "descricao": "texto", "categoria": "categoria", "data": "YYYY-MM-DD", "fornecedor_nome": "nome ou null"}
+RESPONDA APENAS JSON. Se for UMA transação, retorne objeto. Se forem MÚLTIPLAS, retorne ARRAY.
 
-Se forem MÚLTIPLAS transações, retorne um array:
-[
-  {"tipo": "saida", "valor": 50.00, "descricao": "Conta de luz", "categoria": "energia", "data": "YYYY-MM-DD", "fornecedor_nome": null},
-  {"tipo": "saida", "valor": 100.00, "descricao": "Internet", "categoria": "internet", "data": "YYYY-MM-DD", "fornecedor_nome": null}
-]
-
-IMPORTANTE:
-- Se mencionar "Adobe", "programa", "software", "Netflix", "Spotify" → categoria: assinaturas
-- Se mencionar "fornecedor X" ou "para o X" onde X é um nome, extraia fornecedor_nome
-- Se mencionar uma data específica (dia 10, dia 13 de janeiro), use essa data
-- Conectores como "e", "mais", "também" geralmente indicam múltiplas transações
-- Se não conseguir identificar algum campo, use valores padrão sensatos.`
+IMPORTANTE: 
+- SEMPRE extraia o valor correto de cada transação
+- Se mencionar pessoas diferentes, SEPARE em transações diferentes
+- Cada pessoa = uma transação com seu valor específico`
           },
           {
             role: 'user',
             content: texto
           }
         ],
-        temperature: 0.2,
-        max_tokens: 800,
+        temperature: 0.1,
+        max_tokens: 1000,
       }),
     });
 
@@ -140,7 +125,7 @@ IMPORTANTE:
 
     // Processar cada transação
     const resultadoFinal = transacoes.map((item: any) => {
-      // Tentar encontrar fornecedor pelo nome
+      // Tentar encontrar fornecedor/cliente pelo nome
       let fornecedor_id = null;
       if (item.fornecedor_nome && fornecedores && fornecedores.length > 0) {
         const nomeBusca = item.fornecedor_nome.toLowerCase();
@@ -164,16 +149,26 @@ IMPORTANTE:
       };
     });
 
+    // Filtrar transações com valor > 0
+    const transacoesValidas = resultadoFinal.filter((t: any) => t.valor > 0);
+
     // Se for apenas uma transação, retornar objeto simples para compatibilidade
-    if (resultadoFinal.length === 1) {
-      return NextResponse.json(resultadoFinal[0]);
+    if (transacoesValidas.length === 1) {
+      return NextResponse.json(transacoesValidas[0]);
     }
 
     // Se forem múltiplas, retornar array com flag
-    return NextResponse.json({
-      multiplos: true,
-      transacoes: resultadoFinal
-    });
+    if (transacoesValidas.length > 1) {
+      return NextResponse.json({
+        multiplos: true,
+        transacoes: transacoesValidas
+      });
+    }
+
+    // Se nenhuma válida, retornar erro
+    return NextResponse.json({ 
+      error: 'Não foi possível identificar valores. Tente novamente.' 
+    }, { status: 400 });
 
   } catch (error) {
     console.error('Erro ao processar voz:', error);
