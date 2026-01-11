@@ -94,12 +94,56 @@ export default function ImportarPage() {
     setLoading(true);
     
     try {
+      const fileName = file.name.toLowerCase();
+      const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+      
+      if (isExcel) {
+        // Usar nova API para Excel complexo
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch('/api/importar-planilha', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+          alert(data.error + (data.dica ? '\n\n' + data.dica : ''));
+          setLoading(false);
+          return;
+        }
+        
+        if (data.sucesso && data.lancamentos) {
+          // Converter para o formato esperado
+          const linhasProcessadas: LinhaImportada[] = data.lancamentos.map((l: any, idx: number) => ({
+            id: `import-${idx}`,
+            descricao: l.descricao,
+            valor: l.valor,
+            data: l.data,
+            tipo: l.tipo,
+            categoria: detectarCategoria(l.descricao, l.tipo, l.categoria),
+            selecionada: true,
+            confianca: 0.8,
+            original: { descricao: l.descricao, valor: String(l.valor), data: l.data },
+          }));
+          
+          setLinhas(linhasProcessadas);
+          setStep(3); // Pular direto para preview
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Fallback para CSV simples
       const text = await file.text();
       const linhasTexto = text.split('\n').filter(l => l.trim());
       
       // Detectar separador
       const primeiraLinha = linhasTexto[0];
-      const separador = primeiraLinha.includes(';') ? ';' : ',';
+      const separador = primeiraLinha.includes(';') ? ';' : 
+                        primeiraLinha.includes('\t') ? '\t' : ',';
       
       // Parsear CSV
       const dados = linhasTexto.map(linha => {
@@ -130,9 +174,9 @@ export default function ImportarPage() {
       const mapAuto: Record<string, string> = {};
       headers.forEach((col, i) => {
         const colLower = col.toLowerCase();
-        if (colLower.includes('descri') || colLower.includes('historico') || colLower.includes('nome')) {
+        if (colLower.includes('descri') || colLower.includes('historico') || colLower.includes('nome') || colLower.includes('memo')) {
           mapAuto[i.toString()] = 'descricao';
-        } else if (colLower.includes('valor') || colLower.includes('quantia') || colLower.includes('total')) {
+        } else if (colLower.includes('valor') || colLower.includes('quantia') || colLower.includes('total') || colLower.includes('montante')) {
           mapAuto[i.toString()] = 'valor';
         } else if (colLower.includes('data') || colLower.includes('date') || colLower.includes('vencimento')) {
           mapAuto[i.toString()] = 'data';
@@ -147,11 +191,41 @@ export default function ImportarPage() {
       setStep(2);
     } catch (error) {
       console.error('Erro ao ler arquivo:', error);
-      alert('Erro ao ler o arquivo. Verifique se é um CSV válido.');
+      alert('Erro ao ler o arquivo. Verifique se é um arquivo válido (CSV, XLS, XLSX).');
     }
     
     setLoading(false);
   };
+
+  // Função auxiliar para detectar categoria
+  function detectarCategoria(descricao: string, tipo: TipoLancamento, categoriaOriginal?: string): Categoria {
+    const descLower = descricao.toLowerCase();
+    
+    // Se já tem categoria válida
+    if (categoriaOriginal && CATEGORIAS_BASE[categoriaOriginal as Categoria]) {
+      return categoriaOriginal as Categoria;
+    }
+    
+    // Auto-detectar
+    if (tipo === 'entrada') {
+      if (descLower.includes('venda')) return 'vendas';
+      if (descLower.includes('serviço') || descLower.includes('servico')) return 'servicos';
+      if (descLower.includes('freela') || descLower.includes('job')) return 'freela_entrada';
+      return 'vendas';
+    } else {
+      if (descLower.includes('luz') || descLower.includes('energia') || descLower.includes('cpfl') || descLower.includes('eletro')) return 'energia';
+      if (descLower.includes('água') || descLower.includes('agua') || descLower.includes('sabesp') || descLower.includes('saneamento')) return 'agua';
+      if (descLower.includes('internet') || descLower.includes('telefone') || descLower.includes('celular') || descLower.includes('vivo') || descLower.includes('claro') || descLower.includes('tim')) return 'internet';
+      if (descLower.includes('aluguel')) return 'aluguel';
+      if (descLower.includes('salário') || descLower.includes('salario') || descLower.includes('funcionário') || descLower.includes('funcionario')) return 'salarios';
+      if (descLower.includes('imposto') || descLower.includes('das') || descLower.includes('simples') || descLower.includes('icms')) return 'impostos';
+      if (descLower.includes('uber') || descLower.includes('99') || descLower.includes('combustível') || descLower.includes('combustivel') || descLower.includes('gasolina')) return 'transporte';
+      if (descLower.includes('adobe') || descLower.includes('netflix') || descLower.includes('spotify') || descLower.includes('assinatura') || descLower.includes('mensal')) return 'assinaturas';
+      if (descLower.includes('marketing') || descLower.includes('anúncio') || descLower.includes('anuncio') || descLower.includes('google ads') || descLower.includes('facebook')) return 'marketing';
+      if (descLower.includes('fornecedor')) return 'fornecedores';
+      return 'outros_despesas';
+    }
+  }
 
   const processarDados = async () => {
     setProcessando(true);

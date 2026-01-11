@@ -51,6 +51,7 @@ export default function ConfiguracoesPage() {
   const [cnpj, setCnpj] = useState('');
   const [tipoNegocio, setTipoNegocio] = useState<TipoNegocio>('outro');
   const [faixaFaturamento, setFaixaFaturamento] = useState<FaixaFaturamento>('naosei');
+  const [saldoInicial, setSaldoInicial] = useState('');
   
   // Form config
   const [alertaDiasAntes, setAlertaDiasAntes] = useState(3);
@@ -84,6 +85,7 @@ export default function ConfiguracoesPage() {
       setCnpj(emp.cnpj || '');
       setTipoNegocio(emp.tipo_negocio as TipoNegocio);
       setFaixaFaturamento(emp.faixa_faturamento as FaixaFaturamento);
+      setSaldoInicial(emp.saldo_inicial?.toString() || '0');
     }
 
     // Carregar configurações
@@ -108,6 +110,8 @@ export default function ConfiguracoesPage() {
     
     setSalvando(true);
     
+    const valorSaldo = parseFloat(saldoInicial.replace(',', '.')) || 0;
+    
     const { error } = await supabase
       .from('empresas')
       .update({
@@ -115,6 +119,8 @@ export default function ConfiguracoesPage() {
         cnpj: cnpj || null,
         tipo_negocio: tipoNegocio,
         faixa_faturamento: faixaFaturamento,
+        saldo_inicial: valorSaldo,
+        moeda_padrao: empresa.moeda_padrao || 'BRL',
       })
       .eq('id', empresa.id);
     
@@ -253,6 +259,37 @@ export default function ConfiguracoesPage() {
               onChange={(e) => setFaixaFaturamento(e.target.value as FaixaFaturamento)}
               options={FAIXAS_FATURAMENTO}
             />
+
+            <Input
+              label="💰 Saldo inicial do caixa"
+              placeholder="Ex: 1500.00"
+              value={saldoInicial}
+              onChange={(e) => setSaldoInicial(e.target.value)}
+              type="text"
+              inputMode="decimal"
+            />
+            <p className="text-xs text-neutral-500 -mt-3">
+              O valor que havia no caixa quando você começou a usar o sistema
+            </p>
+
+            <Select
+              label="💱 Moeda padrão"
+              value={empresa?.moeda_padrao || 'BRL'}
+              onChange={(e) => {
+                if (empresa) {
+                  setEmpresa({...empresa, moeda_padrao: e.target.value});
+                }
+              }}
+              options={[
+                { value: 'BRL', label: '🇧🇷 Real Brasileiro (R$)' },
+                { value: 'USD', label: '🇺🇸 Dólar Americano ($)' },
+                { value: 'EUR', label: '🇪🇺 Euro (€)' },
+                { value: 'GBP', label: '🇬🇧 Libra Esterlina (£)' },
+              ]}
+            />
+            <p className="text-xs text-neutral-500 -mt-3">
+              A moeda principal usada nos lançamentos
+            </p>
 
             <Button variant="primary" onClick={salvarEmpresa} disabled={salvando}>
               {salvando ? 'Salvando...' : 'Salvar alterações'}

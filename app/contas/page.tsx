@@ -202,6 +202,7 @@ export default function ContasPage() {
   const contasFiltradas = contas.filter(c => {
     if (filtroTipo !== 'todos' && c.tipo !== filtroTipo) return false;
     if (filtroStatus === 'pendentes' && !['pendente', 'atrasado'].includes(c.status)) return false;
+    if (filtroStatus === 'atrasadas' && c.status !== 'atrasado') return false;
     if (filtroStatus === 'pagas' && c.status !== 'pago') return false;
     if (filtroBusca && !c.descricao.toLowerCase().includes(filtroBusca.toLowerCase())) return false;
     return true;
@@ -294,6 +295,7 @@ export default function ContasPage() {
               onChange={(e) => setFiltroStatus(e.target.value)}
               options={[
                 { value: 'pendentes', label: 'Pendentes' },
+                { value: 'atrasadas', label: 'Atrasadas' },
                 { value: 'pagas', label: 'Pagas' },
                 { value: 'todos', label: 'Todas' },
               ]}
@@ -382,6 +384,14 @@ export default function ContasPage() {
             />
           )}
         </Card>
+
+        {/* Botão flutuante para adicionar */}
+        <button
+          onClick={() => { limparForm(); setShowModal(true); }}
+          className="fixed bottom-24 lg:bottom-8 right-4 lg:right-8 w-14 h-14 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center z-40"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
 
         {/* Modal */}
         <Modal

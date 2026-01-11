@@ -198,11 +198,6 @@ export default function RelatorioPage() {
   }
 
   async function gerarRelatorioIA() {
-    if (!xaiApiKey) {
-      alert('Configure sua API Key nas configurações para usar a IA');
-      return;
-    }
-    
     setGerandoRelatorio(true);
     
     try {
@@ -217,44 +212,100 @@ export default function RelatorioPage() {
         tipoNegocio: empresa?.tipo_negocio,
       };
 
-      const response = await fetch('https://api.x.ai/v1/chat/completions', {
+      const response = await fetch('/api/relatorio-ia', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${xaiApiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'grok-3-fast',
-          messages: [
-            {
-              role: 'system',
-              content: `Você é um consultor financeiro especializado em MEIs e pequenas empresas brasileiras.
-                Analise os dados financeiros fornecidos e gere um relatório executivo de 3-4 parágrafos.
-                Use linguagem simples e direta. Inclua:
-                1. Resumo da situação financeira do período
-                2. Principais pontos positivos e de atenção
-                3. 2-3 recomendações práticas
-                Formate com emojis para facilitar a leitura.`
-            },
-            {
-              role: 'user',
-              content: `Dados do relatório:\n${JSON.stringify(resumo, null, 2)}`
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 1000,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumo }),
       });
 
       const data = await response.json();
-      setRelatorioIA(data.choices?.[0]?.message?.content || 'Não foi possível gerar o relatório.');
+      setRelatorioIA(data.relatorio || 'Não foi possível gerar o relatório.');
       
     } catch (error) {
       console.error('Erro ao gerar relatório:', error);
-      setRelatorioIA('Erro ao gerar relatório. Verifique sua conexão e API key.');
+      setRelatorioIA('Erro ao gerar relatório. Tente novamente.');
     }
     
     setGerandoRelatorio(false);
+  }
+
+  function exportarPDF() {
+    // Criar conteúdo HTML do relatório
+    const periodoFormatado = `${formatarDataCurta(dataInicio)} a ${formatarDataCurta(dataFim)}`;
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Relatório Financeiro - ${empresa?.nome}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
+          h1 { color: #0d9488; margin-bottom: 5px; }
+          h2 { color: #555; margin-top: 30px; border-bottom: 2px solid #0d9488; padding-bottom: 5px; }
+          .periodo { color: #666; margin-bottom: 30px; }
+          .resumo { display: flex; gap: 20px; margin: 20px 0; }
+          .card { background: #f5f5f5; padding: 15px 20px; border-radius: 8px; flex: 1; }
+          .card h3 { margin: 0 0 5px 0; font-size: 14px; color: #666; }
+          .card p { margin: 0; font-size: 24px; font-weight: bold; }
+          .entrada { color: #10b981; }
+          .saida { color: #ef4444; }
+          .resultado { color: ${resultado >= 0 ? '#10b981' : '#ef4444'}; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+          th { background: #f5f5f5; }
+          .text-right { text-align: right; }
+          .footer { margin-top: 40px; text-align: center; color: #999; font-size: 12px; }
+          ${relatorioIA ? '.ia-report { background: #f0fdf4; padding: 20px; border-radius: 8px; margin-top: 20px; white-space: pre-wrap; }' : ''}
+        </style>
+      </head>
+      <body>
+        <h1>Relatório Financeiro</h1>
+        <p class="periodo">${empresa?.nome} | ${periodoFormatado}</p>
+        
+        <div class="resumo">
+          <div class="card">
+            <h3>Total de Entradas</h3>
+            <p class="entrada">+ ${formatarMoeda(totalEntradas)}</p>
+          </div>
+          <div class="card">
+            <h3>Total de Saídas</h3>
+            <p class="saida">- ${formatarMoeda(totalSaidas)}</p>
+          </div>
+          <div class="card">
+            <h3>Resultado</h3>
+            <p class="resultado">${formatarMoeda(resultado)}</p>
+          </div>
+        </div>
+
+        <h2>Entradas por Categoria</h2>
+        <table>
+          <tr><th>Categoria</th><th class="text-right">Valor</th></tr>
+          ${entradasPorCategoria.map(c => `<tr><td>${c.name}</td><td class="text-right">${formatarMoeda(c.value)}</td></tr>`).join('')}
+        </table>
+
+        <h2>Saídas por Categoria</h2>
+        <table>
+          <tr><th>Categoria</th><th class="text-right">Valor</th></tr>
+          ${saidasPorCategoria.map(c => `<tr><td>${c.name}</td><td class="text-right">${formatarMoeda(c.value)}</td></tr>`).join('')}
+        </table>
+
+        ${relatorioIA ? `<h2>Análise da IA</h2><div class="ia-report">${relatorioIA}</div>` : ''}
+
+        <p class="footer">Gerado pelo Caixa360 em ${new Date().toLocaleDateString('pt-BR')}</p>
+      </body>
+      </html>
+    `;
+
+    // Abrir em nova aba e imprimir
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    }
   }
 
   if (loading) {
@@ -275,7 +326,7 @@ export default function RelatorioPage() {
               <Sparkles className="w-4 h-4" />
               {gerandoRelatorio ? 'Gerando...' : 'Gerar com IA'}
             </Button>
-            <Button variant="primary">
+            <Button variant="primary" onClick={exportarPDF}>
               <Download className="w-4 h-4" />
               Exportar PDF
             </Button>

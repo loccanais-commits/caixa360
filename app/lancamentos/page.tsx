@@ -18,7 +18,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Calendar
+  Calendar,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function LancamentosPage() {
@@ -37,6 +38,7 @@ export default function LancamentosPage() {
   const [filtroFornecedor, setFiltroFornecedor] = useState<string>('todos');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
+  const [erroData, setErroData] = useState('');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   
   // Resumo do período
@@ -64,6 +66,15 @@ export default function LancamentosPage() {
   useEffect(() => {
     calcularResumoPeriodo();
   }, [lancamentos, dataInicio, dataFim]);
+
+  // Validar datas do filtro
+  useEffect(() => {
+    if (dataInicio && dataFim && dataInicio > dataFim) {
+      setErroData('Data de início não pode ser depois da data de fim');
+    } else {
+      setErroData('');
+    }
+  }, [dataInicio, dataFim]);
 
   async function carregarDados() {
     setLoading(true);
@@ -357,6 +368,15 @@ export default function LancamentosPage() {
                     onChange={(e) => setDataFim(e.target.value)}
                   />
                 </div>
+                
+                {/* Aviso de erro de data */}
+                {erroData && (
+                  <div className="flex items-center gap-2 p-2 bg-saida-light rounded-lg text-sm text-saida-dark">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    <span>{erroData}</span>
+                  </div>
+                )}
+                
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Select
                     label="Categoria"

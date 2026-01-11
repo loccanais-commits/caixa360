@@ -15,7 +15,9 @@ import {
   Phone,
   Mail,
   ChevronRight,
-  TrendingDown
+  TrendingDown,
+  AlertTriangle,
+  Clock
 } from 'lucide-react';
 
 export default function FornecedoresPage() {
@@ -35,6 +37,7 @@ export default function FornecedoresPage() {
   const [showDetalhes, setShowDetalhes] = useState(false);
   const [fornecedorSelecionado, setFornecedorSelecionado] = useState<Fornecedor | null>(null);
   const [historicoFornecedor, setHistoricoFornecedor] = useState<Lancamento[]>([]);
+  const [contasAPagarFornecedor, setContasAPagarFornecedor] = useState<Conta[]>([]);
   const [editando, setEditando] = useState<Fornecedor | null>(null);
   
   // Form
@@ -109,6 +112,7 @@ export default function FornecedoresPage() {
   }
 
   async function carregarHistorico(fornecedor: Fornecedor) {
+    // Buscar lançamentos pagos
     const { data: lancamentos } = await supabase
       .from('lancamentos')
       .select('*')
@@ -116,7 +120,16 @@ export default function FornecedoresPage() {
       .order('data', { ascending: false })
       .limit(20);
     
+    // Buscar contas a pagar pendentes
+    const { data: contasAPagar } = await supabase
+      .from('contas')
+      .select('*')
+      .eq('fornecedor_id', fornecedor.id)
+      .in('status', ['pendente', 'atrasado'])
+      .order('data_vencimento', { ascending: true });
+    
     setHistoricoFornecedor(lancamentos || []);
+    setContasAPagarFornecedor(contasAPagar || []);
     setFornecedorSelecionado(fornecedor);
     setShowDetalhes(true);
   }
@@ -333,6 +346,14 @@ export default function FornecedoresPage() {
           )}
         </div>
 
+        {/* Botão flutuante para adicionar */}
+        <button
+          onClick={() => { limparForm(); setShowModal(true); }}
+          className="fixed bottom-24 lg:bottom-8 right-4 lg:right-8 w-14 h-14 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center z-40"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+
         {/* Modal de cadastro/edição */}
         <Modal
           isOpen={showModal}
@@ -408,25 +429,65 @@ export default function FornecedoresPage() {
           title={`Histórico - ${fornecedorSelecionado?.nome}`}
           size="lg"
         >
-          {historicoFornecedor.length > 0 ? (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {historicoFornecedor.map((lanc) => (
-                <div key={lanc.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl">
-                  <div>
-                    <p className="font-medium text-neutral-900">{lanc.descricao}</p>
-                    <p className="text-sm text-neutral-500">{formatarDataCurta(lanc.data)}</p>
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+            {/* Contas A Pagar */}
+            {contasAPagarFornecedor.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-saida-dark flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  A Pagar ({contasAPagarFornecedor.length})
+                </h4>
+                {contasAPagarFornecedor.map((conta) => (
+                  <div 
+                    key={conta.id} 
+                    className={`flex items-center justify-between p-3 rounded-xl ${
+                      conta.status === 'atrasado' ? 'bg-saida-light/50 border border-saida/20' : 'bg-alerta-light/50'
+                    }`}
+                  >
+                    <div>
+                      <p className="font-medium text-neutral-900">{conta.descricao}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-neutral-500">Vence: {formatarDataCurta(conta.data_vencimento)}</p>
+                        {conta.status === 'atrasado' && (
+                          <Badge variant="saida" className="text-xs">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            Atrasado
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <p className="font-bold text-saida-dark">{formatarMoeda(Number(conta.valor))}</p>
                   </div>
-                  <p className="font-bold text-saida-dark">{formatarMoeda(Number(lanc.valor))}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={<TrendingDown className="w-8 h-8" />}
-              title="Nenhuma compra registrada"
-              description="As compras aparecerão aqui quando você vincular lançamentos a este fornecedor"
-            />
-          )}
+                ))}
+              </div>
+            )}
+
+            {/* Histórico de compras */}
+            {historicoFornecedor.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-neutral-700">
+                  Compras realizadas ({historicoFornecedor.length})
+                </h4>
+                {historicoFornecedor.map((lanc) => (
+                  <div key={lanc.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl">
+                    <div>
+                      <p className="font-medium text-neutral-900">{lanc.descricao}</p>
+                      <p className="text-sm text-neutral-500">{formatarDataCurta(lanc.data)}</p>
+                    </div>
+                    <p className="font-bold text-neutral-700">{formatarMoeda(Number(lanc.valor))}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {historicoFornecedor.length === 0 && contasAPagarFornecedor.length === 0 && (
+              <EmptyState
+                icon={<TrendingDown className="w-8 h-8" />}
+                title="Nenhuma movimentação"
+                description="As compras e contas aparecerão aqui quando você vincular a este fornecedor"
+              />
+            )}
+          </div>
         </Modal>
       </div>
     </AppLayout>

@@ -6,7 +6,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Avatar, Button, Badge, Input, Select, Modal } from '@/components/ui';
-import { CATEGORIAS_BASE, Categoria, TipoLancamento } from '@/lib/types';
+import { CATEGORIAS_BASE, Categoria, TipoLancamento, Fornecedor } from '@/lib/types';
+import { InstallPWA } from '@/components/InstallPWA';
+import { NotificacoesPanel, useNotificacoesCount } from '@/components/NotificacoesPanel';
 import clsx from 'clsx';
 import {
   LayoutDashboard,
@@ -28,21 +30,24 @@ import {
   Bot,
   Send,
   MessageCircle,
-  UserPlus
+  UserPlus,
+  Tag
 } from 'lucide-react';
 
 interface AppLayoutProps {
   children: ReactNode;
 }
 
+// Menu reorganizado: Meu Salário antes de Relatório
 const menuItems = [
   { href: '/dashboard', label: 'Visão Geral', icon: LayoutDashboard },
   { href: '/lancamentos', label: 'Lançamentos', icon: ArrowLeftRight },
   { href: '/fornecedores', label: 'Fornecedores', icon: Package },
-  { href: '/salario', label: 'Meu Salário', icon: Wallet },
   { href: '/contas', label: 'Contas', icon: Calendar, badge: true },
-  { href: '/importar', label: 'Importar', icon: Upload },
+  { href: '/categorias', label: 'Categorias', icon: Tag },
+  { href: '/salario', label: 'Meu Salário', icon: Wallet },
   { href: '/relatorio', label: 'Relatório', icon: FileText },
+  { href: '/importar', label: 'Importar', icon: Upload },
 ];
 
 export function AppLayout({ children }: AppLayoutProps) {
@@ -60,6 +65,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [showLancamentoModal, setShowLancamentoModal] = useState(false);
   const [tipoLancamento, setTipoLancamento] = useState<'entrada' | 'saida'>('entrada');
   const [showAssistente, setShowAssistente] = useState(false);
+  const [showNotificacoes, setShowNotificacoes] = useState(false);
+  
+  // Hook para contar notificações
+  const notificacoesCount = useNotificacoesCount(empresaId);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -175,9 +184,29 @@ export function AppLayout({ children }: AppLayoutProps) {
             <span className="font-bold gradient-text">Caixa360</span>
           </div>
 
-          <Link href="/configuracoes" className="p-2 hover:bg-neutral-100 rounded-lg">
-            <Settings className="w-6 h-6 text-neutral-600" />
-          </Link>
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <button 
+                onClick={() => setShowNotificacoes(!showNotificacoes)}
+                className="p-2 hover:bg-neutral-100 rounded-lg relative"
+              >
+                <Bell className="w-6 h-6 text-neutral-600" />
+                {notificacoesCount > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 bg-saida text-white text-xs rounded-full flex items-center justify-center">
+                    {notificacoesCount > 9 ? '9+' : notificacoesCount}
+                  </span>
+                )}
+              </button>
+              <NotificacoesPanel 
+                isOpen={showNotificacoes} 
+                onClose={() => setShowNotificacoes(false)}
+                empresaId={empresaId}
+              />
+            </div>
+            <Link href="/configuracoes" className="p-2 hover:bg-neutral-100 rounded-lg">
+              <Settings className="w-6 h-6 text-neutral-600" />
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -289,6 +318,9 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* Floating Voice Button - Ajustado para mobile */}
       <VoiceButton empresaId={empresaId} onSuccess={() => window.location.reload()} />
+
+      {/* PWA Install Banner */}
+      <InstallPWA />
     </div>
   );
 }
@@ -548,6 +580,7 @@ function QuickLancamentoModal({
   const [fornecedores, setFornecedores] = useState<any[]>([]);
   const [showNovoFornecedor, setShowNovoFornecedor] = useState(false);
   const [novoFornecedorNome, setNovoFornecedorNome] = useState('');
+  const [observacao, setObservacao] = useState('');
   const [salvando, setSalvando] = useState(false);
   const supabase = createClient();
 
@@ -608,6 +641,7 @@ function QuickLancamentoModal({
         data_vencimento: dataEscolhida,
         status: 'pendente',
         fornecedor_id: tipo === 'saida' ? (fornecedorId || null) : null,
+        observacao: observacao || null,
       });
     } else {
       // Se for hoje ou passado, criar como lançamento
@@ -619,6 +653,7 @@ function QuickLancamentoModal({
         categoria,
         data: dataEscolhida,
         fornecedor_id: tipo === 'saida' ? (fornecedorId || null) : null,
+        observacao: observacao || null,
       });
     }
     
@@ -626,6 +661,7 @@ function QuickLancamentoModal({
     setDescricao('');
     setValor('');
     setFornecedorId('');
+    setObservacao('');
     onSuccess();
   };
 
@@ -757,6 +793,13 @@ function QuickLancamentoModal({
             onChange={(e) => setData(e.target.value)}
           />
 
+          <Input
+            label="Observação (opcional)"
+            placeholder="Detalhes adicionais..."
+            value={observacao}
+            onChange={(e) => setObservacao(e.target.value)}
+          />
+
           {/* Aviso de data futura */}
           {ehFuturo && (
             <div className="p-3 bg-alerta-light rounded-xl text-sm text-alerta-dark flex items-center gap-2">
@@ -801,9 +844,10 @@ function AssistenteSidebar({
 }) {
   const [mensagem, setMensagem] = useState('');
   const [conversas, setConversas] = useState<{role: 'user' | 'assistant', content: string}[]>([
-    { role: 'assistant', content: 'Olá! 👋 Sou seu assistente financeiro.\n\nPosso ajudar com:\n• "Quanto gastei esse mês?"\n• "Qual minha maior despesa?"\n• "Como está meu fluxo de caixa?"' }
+    { role: 'assistant', content: 'Olá! 👋 Sou seu assistente financeiro.\n\nPosso ajudar com:\n• "Quanto gastei esse mês?"\n• "Qual minha maior despesa?"\n• Enviar documentos para análise 📎' }
   ]);
   const [processando, setProcessando] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
   const supabase = createClient();
 
   const enviarMensagem = async () => {
@@ -815,10 +859,12 @@ function AssistenteSidebar({
     setProcessando(true);
 
     try {
-      const [lancamentos, contas, empresa] = await Promise.all([
-        supabase.from('lancamentos').select('*').eq('empresa_id', empresaId).order('data', { ascending: false }).limit(50),
+      // Buscar TODOS os dados necessários incluindo fornecedores
+      const [lancamentos, contas, empresa, fornecedores] = await Promise.all([
+        supabase.from('lancamentos').select('*').eq('empresa_id', empresaId).order('data', { ascending: false }).limit(100),
         supabase.from('contas').select('*').eq('empresa_id', empresaId),
         supabase.from('empresas').select('*').eq('id', empresaId).single(),
+        supabase.from('fornecedores').select('*').eq('empresa_id', empresaId),
       ]);
 
       const response = await fetch('/api/assistente', {
@@ -830,6 +876,7 @@ function AssistenteSidebar({
             lancamentos: lancamentos.data,
             contas: contas.data,
             empresa: empresa.data,
+            fornecedores: fornecedores.data,
           }
         }),
       });
@@ -841,6 +888,42 @@ function AssistenteSidebar({
     }
 
     setProcessando(false);
+  };
+
+  const handleDocumentoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingDoc(true);
+    setConversas(prev => [...prev, { role: 'user', content: `📎 Enviando: ${file.name}` }]);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('empresaId', empresaId);
+
+      const response = await fetch('/api/processar-documento', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        setConversas(prev => [...prev, { role: 'assistant', content: `❌ ${data.error}` }]);
+      } else {
+        setConversas(prev => [...prev, { 
+          role: 'assistant', 
+          content: `📄 **Documento analisado:** ${data.arquivo.nome}\n\n${data.analise}` 
+        }]);
+      }
+    } catch (error) {
+      setConversas(prev => [...prev, { role: 'assistant', content: 'Erro ao processar documento. Tente novamente.' }]);
+    }
+
+    setUploadingDoc(false);
+    // Limpar input
+    e.target.value = '';
   };
 
   if (!isOpen) return null;
@@ -903,6 +986,21 @@ function AssistenteSidebar({
         {/* Input */}
         <div className="p-4 border-t border-neutral-100">
           <div className="flex gap-2">
+            {/* Botão de upload */}
+            <label className="p-2.5 bg-neutral-100 hover:bg-neutral-200 rounded-xl cursor-pointer transition-colors">
+              <input
+                type="file"
+                accept=".txt,.csv,.pdf,image/*"
+                onChange={handleDocumentoUpload}
+                className="hidden"
+                disabled={uploadingDoc}
+              />
+              {uploadingDoc ? (
+                <div className="w-5 h-5 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Upload className="w-5 h-5 text-neutral-500" />
+              )}
+            </label>
             <input
               type="text"
               value={mensagem}
@@ -919,6 +1017,9 @@ function AssistenteSidebar({
               <Send className="w-5 h-5" />
             </button>
           </div>
+          <p className="text-xs text-neutral-400 mt-1 text-center">
+            📎 Envie documentos TXT, CSV ou imagens
+          </p>
         </div>
       </div>
     </>

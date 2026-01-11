@@ -35,6 +35,7 @@ export default function SalarioPage() {
   // Modal
   const [showModal, setShowModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [editandoRetirada, setEditandoRetirada] = useState<RetiradaProlabore | null>(null);
   
   // Form retirada
   const [valor, setValor] = useState('');
@@ -112,29 +113,54 @@ export default function SalarioPage() {
     
     const valorNum = parseFloat(valor.replace(',', '.'));
     
-    // Criar retirada
-    await supabase.from('retiradas_prolabore').insert({
-      empresa_id: empresa.id,
-      valor: valorNum,
-      data,
-      observacao: observacao || null,
-    });
+    if (editandoRetirada) {
+      // Atualizar retirada existente
+      await supabase.from('retiradas_prolabore').update({
+        valor: valorNum,
+        data,
+        observacao: observacao || null,
+      }).eq('id', editandoRetirada.id);
+    } else {
+      // Criar nova retirada
+      await supabase.from('retiradas_prolabore').insert({
+        empresa_id: empresa.id,
+        valor: valorNum,
+        data,
+        observacao: observacao || null,
+      });
 
-    // Criar lançamento de saída correspondente
-    await supabase.from('lancamentos').insert({
-      empresa_id: empresa.id,
-      tipo: 'saida',
-      descricao: `Pró-labore - ${observacao || 'Retirada mensal'}`,
-      valor: valorNum,
-      categoria: 'prolabore',
-      data,
-    });
+      // Criar lançamento de saída correspondente
+      await supabase.from('lancamentos').insert({
+        empresa_id: empresa.id,
+        tipo: 'saida',
+        descricao: `Pró-labore - ${observacao || 'Retirada mensal'}`,
+        valor: valorNum,
+        categoria: 'prolabore',
+        data,
+      });
+    }
     
     setSalvando(false);
     setShowModal(false);
+    setEditandoRetirada(null);
     setValor('');
     setObservacao('');
     carregarDados();
+  }
+
+  function abrirEditarRetirada(retirada: RetiradaProlabore) {
+    setEditandoRetirada(retirada);
+    setValor(retirada.valor.toString());
+    setData(retirada.data);
+    setObservacao(retirada.observacao || '');
+    setShowModal(true);
+  }
+
+  function limparFormRetirada() {
+    setEditandoRetirada(null);
+    setValor('');
+    setData(new Date().toISOString().split('T')[0]);
+    setObservacao('');
   }
 
   async function handleSalvarConfig() {
@@ -259,6 +285,32 @@ export default function SalarioPage() {
               </div>
             </div>
           )}
+
+          {/* Aviso se pró-labore está fora da faixa sugerida */}
+          {prolaboreDefinido > 0 && sugestao.max > 0 && !excedeu && (
+            prolaboreDefinido > sugestao.max ? (
+              <div className="mt-4 p-4 bg-alerta-light rounded-xl flex items-start gap-3">
+                <Info className="w-5 h-5 text-alerta-dark flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-alerta-dark">Acima da faixa sugerida</p>
+                  <p className="text-sm text-neutral-700">
+                    Seu pró-labore está acima da faixa sugerida ({formatarMoeda(sugestao.min)} a {formatarMoeda(sugestao.max)}). 
+                    Considere reservar mais para o capital de giro da empresa.
+                  </p>
+                </div>
+              </div>
+            ) : prolaboreDefinido < sugestao.min && (
+              <div className="mt-4 p-4 bg-primary-50 rounded-xl flex items-start gap-3">
+                <TrendingUp className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-primary-700">Você pode aumentar!</p>
+                  <p className="text-sm text-neutral-700">
+                    Baseado no seu negócio, você poderia definir um pró-labore entre {formatarMoeda(sugestao.min)} e {formatarMoeda(sugestao.max)}.
+                  </p>
+                </div>
+              </div>
+            )
+          )}
         </Card>
 
         {/* Sugestão da IA */}
@@ -330,12 +382,20 @@ export default function SalarioPage() {
                         <p className="text-xs text-neutral-400 mt-1">{ret.observacao}</p>
                       )}
                     </div>
-                    <button 
-                      onClick={() => handleExcluirRetirada(ret.id)}
-                      className="p-2 hover:bg-saida-light rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4 text-saida" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => abrirEditarRetirada(ret)}
+                        className="p-2 hover:bg-primary-100 rounded-lg transition-colors"
+                      >
+                        <Edit className="w-4 h-4 text-primary-500" />
+                      </button>
+                      <button 
+                        onClick={() => handleExcluirRetirada(ret.id)}
+                        className="p-2 hover:bg-saida-light rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4 text-saida" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -376,14 +436,16 @@ export default function SalarioPage() {
         {/* Modal de retirada */}
         <Modal
           isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          title="Registrar Retirada"
+          onClose={() => { setShowModal(false); limparFormRetirada(); }}
+          title={editandoRetirada ? "Editar Retirada" : "Registrar Retirada"}
         >
           <div className="space-y-4">
-            <div className="p-4 bg-secondary-50 rounded-xl">
-              <p className="text-sm text-neutral-600">Disponível este mês</p>
-              <p className="text-2xl font-bold text-secondary-700">{formatarMoeda(disponivel)}</p>
-            </div>
+            {!editandoRetirada && (
+              <div className="p-4 bg-secondary-50 rounded-xl">
+                <p className="text-sm text-neutral-600">Disponível este mês</p>
+                <p className="text-2xl font-bold text-secondary-700">{formatarMoeda(disponivel)}</p>
+              </div>
+            )}
 
             <Input
               label="Valor (R$)"
@@ -407,14 +469,14 @@ export default function SalarioPage() {
               onChange={(e) => setObservacao(e.target.value)}
             />
 
-            {parseFloat(valor.replace(',', '.') || '0') > disponivel && disponivel > 0 && (
+            {!editandoRetirada && parseFloat(valor.replace(',', '.') || '0') > disponivel && disponivel > 0 && (
               <div className="p-3 bg-alerta-light rounded-xl text-sm text-alerta-dark">
                 ⚠️ Esse valor ultrapassa seu pró-labore disponível
               </div>
             )}
 
             <div className="flex gap-2 pt-4">
-              <Button variant="ghost" onClick={() => setShowModal(false)} className="flex-1">
+              <Button variant="ghost" onClick={() => { setShowModal(false); limparFormRetirada(); }} className="flex-1">
                 Cancelar
               </Button>
               <Button 

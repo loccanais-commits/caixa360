@@ -80,6 +80,7 @@ export interface Empresa {
   dor_principal: DorPrincipal;
   saldo_inicial: number;
   prolabore_definido: number;
+  moeda_padrao: string;
   data_inicio: string;
   created_at: string;
   updated_at: string;
@@ -91,10 +92,13 @@ export interface Lancamento {
   tipo: TipoLancamento;
   descricao: string;
   valor: number;
-  categoria: Categoria;
+  categoria: Categoria | string; // Pode ser categoria personalizada
   data: string;
   fornecedor_id?: string;
   observacao?: string;
+  moeda?: string;
+  taxa_cambio?: number;
+  valor_convertido?: number;
   created_at: string;
 }
 
@@ -104,13 +108,16 @@ export interface Conta {
   tipo: TipoLancamento;
   descricao: string;
   valor: number;
-  categoria: Categoria;
+  categoria: Categoria | string;
   data_vencimento: string;
   data_pagamento?: string;
   status: StatusConta;
   fornecedor_id?: string;
   recorrente: boolean;
   observacao?: string;
+  moeda?: string;
+  taxa_cambio?: number;
+  valor_convertido?: number;
   created_at: string;
 }
 
@@ -192,3 +199,62 @@ export const FATURAMENTO_VALORES: Record<FaixaFaturamento, { min: number; max: n
   acima20k: { min: 20000, max: 50000, medio: 30000 },
   naosei: { min: 0, max: 10000, medio: 5000 },
 };
+
+// ==================== NOVAS INTERFACES v6 ====================
+
+export interface CategoriaPersonalizada {
+  id: string;
+  empresa_id: string;
+  nome: string;
+  tipo: TipoLancamento;
+  icone: string;
+  cor: string;
+  ativa: boolean;
+  created_at: string;
+}
+
+export type TipoNotificacao = 'conta_vencer' | 'conta_atrasada' | 'meta_atingida' | 'alerta_gasto' | 'lembrete';
+
+export interface Notificacao {
+  id: string;
+  empresa_id: string;
+  tipo: TipoNotificacao;
+  titulo: string;
+  mensagem: string;
+  conta_id?: string;
+  lida: boolean;
+  data_referencia?: string;
+  created_at: string;
+}
+
+export interface DocumentoAssistente {
+  id: string;
+  empresa_id: string;
+  nome_arquivo: string;
+  tipo_arquivo: string;
+  conteudo_extraido?: string;
+  url_arquivo?: string;
+  tamanho_bytes?: number;
+  processado: boolean;
+  created_at: string;
+}
+
+// ==================== MOEDAS SUPORTADAS ====================
+
+export const MOEDAS = {
+  BRL: { simbolo: 'R$', nome: 'Real Brasileiro', locale: 'pt-BR' },
+  USD: { simbolo: '$', nome: 'Dólar Americano', locale: 'en-US' },
+  EUR: { simbolo: '€', nome: 'Euro', locale: 'de-DE' },
+  GBP: { simbolo: '£', nome: 'Libra Esterlina', locale: 'en-GB' },
+};
+
+export type Moeda = keyof typeof MOEDAS;
+
+// ==================== ICONES PARA CATEGORIAS ====================
+
+export const ICONES_CATEGORIAS = [
+  '💰', '💵', '💳', '🏦', '📦', '🛒', '🏠', '💡', '💧', '📱',
+  '👥', '📋', '📢', '🚗', '🔧', '🖥️', '💻', '📤', '📥', '✂️',
+  '💼', '💄', '💇', '🥬', '🔥', '🏷️', '⚙️', '🔨', '🎯', '📊',
+  '🎨', '🎬', '📸', '🎵', '🍽️', '☕', '🏋️', '💊', '🎓', '✈️'
+];
