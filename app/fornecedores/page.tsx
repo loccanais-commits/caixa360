@@ -35,10 +35,17 @@ export default function FornecedoresPage() {
   // Modal
   const [showModal, setShowModal] = useState(false);
   const [showDetalhes, setShowDetalhes] = useState(false);
+  const [showEditLancamento, setShowEditLancamento] = useState(false);
   const [fornecedorSelecionado, setFornecedorSelecionado] = useState<Fornecedor | null>(null);
   const [historicoFornecedor, setHistoricoFornecedor] = useState<Lancamento[]>([]);
   const [contasAPagarFornecedor, setContasAPagarFornecedor] = useState<Conta[]>([]);
   const [editando, setEditando] = useState<Fornecedor | null>(null);
+  const [lancamentoEditando, setLancamentoEditando] = useState<Lancamento | null>(null);
+  
+  // Form edição lançamento
+  const [editDescricao, setEditDescricao] = useState('');
+  const [editValor, setEditValor] = useState('');
+  const [editData, setEditData] = useState('');
   
   // Form
   const [nome, setNome] = useState('');
@@ -178,6 +185,52 @@ export default function FornecedoresPage() {
     carregarDados();
   }
 
+  // Funções para edição de lançamento no histórico
+  function abrirEditarLancamento(lanc: Lancamento) {
+    setLancamentoEditando(lanc);
+    setEditDescricao(lanc.descricao);
+    setEditValor(String(lanc.valor));
+    setEditData(lanc.data);
+    setShowEditLancamento(true);
+  }
+
+  async function salvarEdicaoLancamento() {
+    if (!lancamentoEditando) return;
+    
+    setSalvando(true);
+    
+    await supabase
+      .from('lancamentos')
+      .update({
+        descricao: editDescricao,
+        valor: parseFloat(editValor) || 0,
+        data: editData,
+      })
+      .eq('id', lancamentoEditando.id);
+    
+    // Recarregar histórico
+    if (fornecedorSelecionado) {
+      await carregarHistorico(fornecedorSelecionado);
+    }
+    
+    setShowEditLancamento(false);
+    setLancamentoEditando(null);
+    setSalvando(false);
+    carregarDados();
+  }
+
+  async function excluirLancamento(id: string) {
+    if (!confirm('Deseja excluir este lançamento?')) return;
+    
+    await supabase.from('lancamentos').delete().eq('id', id);
+    
+    // Recarregar histórico
+    if (fornecedorSelecionado) {
+      await carregarHistorico(fornecedorSelecionado);
+    }
+    carregarDados();
+  }
+
   function limparForm() {
     setEditando(null);
     setNome('');
@@ -222,7 +275,11 @@ export default function FornecedoresPage() {
             <h1 className="text-2xl font-bold text-neutral-900">Fornecedores</h1>
             <p className="text-neutral-500">Gerencie seus fornecedores e compras</p>
           </div>
-          <Button variant="primary" onClick={() => { limparForm(); setShowModal(true); }}>
+          <Button 
+            variant="primary" 
+            onClick={() => { limparForm(); setShowModal(true); }}
+            className="bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600 shadow-lg hover:shadow-xl transition-all"
+          >
             <Plus className="w-4 h-4" />
             Novo Fornecedor
           </Button>
@@ -346,14 +403,6 @@ export default function FornecedoresPage() {
           )}
         </div>
 
-        {/* Botão flutuante para adicionar */}
-        <button
-          onClick={() => { limparForm(); setShowModal(true); }}
-          className="fixed bottom-24 lg:bottom-8 right-4 lg:right-8 w-14 h-14 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center z-40"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
-
         {/* Modal de cadastro/edição */}
         <Modal
           isOpen={showModal}
@@ -469,12 +518,30 @@ export default function FornecedoresPage() {
                   Compras realizadas ({historicoFornecedor.length})
                 </h4>
                 {historicoFornecedor.map((lanc) => (
-                  <div key={lanc.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl">
-                    <div>
+                  <div key={lanc.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl group hover:bg-neutral-100 transition-colors">
+                    <div className="flex-1">
                       <p className="font-medium text-neutral-900">{lanc.descricao}</p>
                       <p className="text-sm text-neutral-500">{formatarDataCurta(lanc.data)}</p>
                     </div>
-                    <p className="font-bold text-neutral-700">{formatarMoeda(Number(lanc.valor))}</p>
+                    <div className="flex items-center gap-3">
+                      <p className="font-bold text-neutral-700">{formatarMoeda(Number(lanc.valor))}</p>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => abrirEditarLancamento(lanc)}
+                          className="p-1.5 hover:bg-primary-100 rounded-lg transition-colors"
+                          title="Editar"
+                        >
+                          <Edit className="w-4 h-4 text-primary-600" />
+                        </button>
+                        <button
+                          onClick={() => excluirLancamento(lanc.id)}
+                          className="p-1.5 hover:bg-saida-light rounded-lg transition-colors"
+                          title="Excluir"
+                        >
+                          <Trash2 className="w-4 h-4 text-saida" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -487,6 +554,53 @@ export default function FornecedoresPage() {
                 description="As compras e contas aparecerão aqui quando você vincular a este fornecedor"
               />
             )}
+          </div>
+        </Modal>
+
+        {/* Modal de edição de lançamento */}
+        <Modal
+          isOpen={showEditLancamento}
+          onClose={() => { setShowEditLancamento(false); setLancamentoEditando(null); }}
+          title="Editar Lançamento"
+        >
+          <div className="space-y-4">
+            <Input
+              label="Descrição"
+              value={editDescricao}
+              onChange={(e) => setEditDescricao(e.target.value)}
+              placeholder="Descrição do lançamento"
+            />
+            <Input
+              label="Valor"
+              type="number"
+              step="0.01"
+              value={editValor}
+              onChange={(e) => setEditValor(e.target.value)}
+              placeholder="0,00"
+            />
+            <Input
+              label="Data"
+              type="date"
+              value={editData}
+              onChange={(e) => setEditData(e.target.value)}
+            />
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => { setShowEditLancamento(false); setLancamentoEditando(null); }}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={salvarEdicaoLancamento}
+                disabled={salvando}
+                className="flex-1"
+              >
+                {salvando ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
           </div>
         </Modal>
       </div>

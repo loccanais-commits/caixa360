@@ -57,6 +57,13 @@ export default function ConfiguracoesPage() {
   const [alertaDiasAntes, setAlertaDiasAntes] = useState(3);
   const [notificacoesPush, setNotificacoesPush] = useState(true);
   const [diaResumoSemanal, setDiaResumoSemanal] = useState(1);
+  
+  // Taxas padrão por forma de pagamento (R$ ou %)
+  const [taxaPix, setTaxaPix] = useState(''); 
+  const [taxaDebito, setTaxaDebito] = useState('');
+  const [taxaCredito, setTaxaCredito] = useState('');
+  const [taxaBoleto, setTaxaBoleto] = useState('');
+  const [taxaTicket, setTaxaTicket] = useState('');
 
   useEffect(() => {
     carregarDados();
@@ -100,6 +107,12 @@ export default function ConfiguracoesPage() {
       setAlertaDiasAntes(cfg.alerta_dias_antes);
       setNotificacoesPush(cfg.notificacoes_push);
       setDiaResumoSemanal(cfg.dia_resumo_semanal);
+      // Carregar taxas padrão
+      setTaxaPix(cfg.taxa_pix ? String(cfg.taxa_pix) : '');
+      setTaxaDebito(cfg.taxa_debito ? String(cfg.taxa_debito) : '');
+      setTaxaCredito(cfg.taxa_credito ? String(cfg.taxa_credito) : '');
+      setTaxaBoleto(cfg.taxa_boleto ? String(cfg.taxa_boleto) : '');
+      setTaxaTicket(cfg.taxa_ticket ? String(cfg.taxa_ticket) : '');
     }
     
     setLoading(false);
@@ -145,6 +158,12 @@ export default function ConfiguracoesPage() {
         alerta_dias_antes: alertaDiasAntes,
         notificacoes_push: notificacoesPush,
         dia_resumo_semanal: diaResumoSemanal,
+        // Taxas padrão (salvar como string para suportar R$ ou %)
+        taxa_pix: taxaPix || null,
+        taxa_debito: taxaDebito || null,
+        taxa_credito: taxaCredito || null,
+        taxa_boleto: taxaBoleto || null,
+        taxa_ticket: taxaTicket || null,
       })
       .eq('id', config.id);
     
@@ -353,6 +372,70 @@ export default function ConfiguracoesPage() {
                 <p className="text-sm text-neutral-500">Receber alertas no navegador</p>
               </div>
             </label>
+
+            {/* Taxas padrão por forma de pagamento */}
+            <div className="pt-4 border-t">
+              <p className="font-medium text-neutral-900 mb-3">💳 Taxas Padrão por Forma de Pagamento</p>
+              <p className="text-xs text-neutral-500 mb-4">
+                Configure taxas automáticas para entradas. Você pode usar valor fixo (ex: 2,50) ou percentual (ex: 3%).
+              </p>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs text-neutral-500 mb-1 block">📱 PIX</label>
+                  <input
+                    type="text"
+                    value={taxaPix}
+                    onChange={(e) => setTaxaPix(e.target.value)}
+                    placeholder="0,99 ou 1%"
+                    className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-neutral-500 mb-1 block">💳 Débito</label>
+                  <input
+                    type="text"
+                    value={taxaDebito}
+                    onChange={(e) => setTaxaDebito(e.target.value)}
+                    placeholder="1,5%"
+                    className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-neutral-500 mb-1 block">💳 Crédito</label>
+                  <input
+                    type="text"
+                    value={taxaCredito}
+                    onChange={(e) => setTaxaCredito(e.target.value)}
+                    placeholder="3,5%"
+                    className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-neutral-500 mb-1 block">📄 Boleto</label>
+                  <input
+                    type="text"
+                    value={taxaBoleto}
+                    onChange={(e) => setTaxaBoleto(e.target.value)}
+                    placeholder="3,50"
+                    className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-neutral-500 mb-1 block">🎟️ Ticket</label>
+                  <input
+                    type="text"
+                    value={taxaTicket}
+                    onChange={(e) => setTaxaTicket(e.target.value)}
+                    placeholder="2%"
+                    className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-neutral-400 mt-2">
+                💡 Dica: Use "%" para percentual ou apenas números para valor fixo em R$
+              </p>
+            </div>
 
             <Button variant="primary" onClick={salvarConfig} disabled={salvando}>
               {salvando ? 'Salvando...' : 'Salvar preferências'}

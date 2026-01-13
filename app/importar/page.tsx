@@ -50,6 +50,12 @@ export default function ImportarPage() {
   const [dadosBrutos, setDadosBrutos] = useState<string[][]>([]);
   const [colunas, setColunas] = useState<string[]>([]);
   
+  // Seleção de aba (para planilhas com múltiplas abas)
+  const [abas, setAbas] = useState<string[]>([]);
+  const [abaEscolhida, setAbaEscolhida] = useState<string>('');
+  const [isOrcamento, setIsOrcamento] = useState(false);
+  const [mesReferencia, setMesReferencia] = useState<string>(new Date().toISOString().split('T')[0].slice(0, 7));
+  
   // Step 2: Mapeamento
   const [mapeamento, setMapeamento] = useState<Record<string, string>>({});
   
@@ -92,10 +98,12 @@ export default function ImportarPage() {
     
     setArquivo(file);
     setLoading(true);
+    setAbas([]);
+    setAbaEscolhida('');
     
     try {
       const fileName = file.name.toLowerCase();
-      const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+      const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv');
       
       if (isExcel) {
         // Usar nova API para Excel complexo
@@ -115,6 +123,15 @@ export default function ImportarPage() {
           return;
         }
         
+        // Se tem múltiplas abas, mostrar seletor
+        if (data.requiresSelection) {
+          setAbas(data.abas);
+          setIsOrcamento(data.isOrcamento);
+          setStep(0); // Step especial para seleção de aba
+          setLoading(false);
+          return;
+        }
+        
         if (data.sucesso && data.lancamentos) {
           // Converter para o formato esperado
           const linhasProcessadas: LinhaImportada[] = data.lancamentos.map((l: any, idx: number) => ({
@@ -126,7 +143,7 @@ export default function ImportarPage() {
             categoria: detectarCategoria(l.descricao, l.tipo, l.categoria),
             selecionada: true,
             confianca: 0.8,
-            original: { descricao: l.descricao, valor: String(l.valor), data: l.data },
+            original: { descricao: l.descricao, valor: String(l.valor), data: l.data, secao: l.secao },
           }));
           
           setLinhas(linhasProcessadas);
@@ -192,6 +209,123 @@ export default function ImportarPage() {
     } catch (error) {
       console.error('Erro ao ler arquivo:', error);
       alert('Erro ao ler o arquivo. Verifique se é um arquivo válido (CSV, XLS, XLSX).');
+    }
+    
+    setLoading(false);
+  };
+
+  // Processar aba escolhida de planilha com múltiplas abas
+  const processarAbaEscolhida = async () => {
+    if (!arquivo || !abaEscolhida) return;
+    
+    setLoading(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', arquivo);
+      formData.append('aba', abaEscolhida);
+      formData.append('mesReferencia', `${mesReferencia}-15`); // Dia 15 do mês escolhido
+      
+      const response = await fetch('/api/importar-planilha', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        alert(data.error + (data.dica ? '\n\n' + data.dica : ''));
+        setLoading(false);
+        return;
+      }
+      
+      if (data.sucesso && data.lancamentos) {
+        const linhasProcessadas: LinhaImportada[] = data.lancamentos.map((l: any, idx: number) => ({
+          id: `import-${idx}`,
+          descricao: l.descricao,
+          valor: l.valor,
+          data: l.data,
+          tipo: l.tipo,
+          categoria: detectarCategoria(l.descricao, l.tipo, l.categoria),
+          selecionada: true,
+          confianca: 0.8,
+          original: { descricao: l.descricao, valor: String(l.valor), data: l.data, secao: l.secao },
+        }));
+        
+        setLinhas(linhasProcessadas);
+        setStep(3);
+      }
+    } catch (error) {
+      console.error('Erro ao processar aba:', error);
+      alert('Erro ao processar a aba selecionada.');
+    }
+    
+    setLoading(false);
+  };
+
+  // Processar TODAS as abas de uma vez
+  const processarTodasAbas = async () => {
+    if (!arquivo || abas.length === 0) return;
+    
+    setLoading(true);
+    
+    const todasLinhas: LinhaImportada[] = [];
+    const mesesMap: Record<string, string> = {
+      'JANEIRO': '01', 'FEVEREIRO': '02', 'MARÇO': '03', 'ABRIL': '04',
+      'MAIO': '05', 'JUNHO': '06', 'JULHO': '07', 'AGOSTO': '08',
+      'SETEMBRO': '09', 'OUTUBRO': '10', 'NOVEMBRO': '11', 'DEZEMBRO': '12',
+      'JAN': '01', 'FEV': '02', 'MAR': '03', 'ABR': '04', 'MAI': '05',
+      'JUN': '06', 'JUL': '07', 'AGO': '08', 'SET': '09', 'OUT': '10',
+      'NOV': '11', 'DEZ': '12'
+    };
+    
+    const anoRef = mesReferencia.split('-')[0] || new Date().getFullYear().toString();
+    
+    try {
+      for (const aba of abas) {
+        // Detectar mês pelo nome da aba
+        const abaUpper = aba.toUpperCase();
+        const mesNum = mesesMap[abaUpper] || '01';
+        const dataRef = `${anoRef}-${mesNum}-15`;
+        
+        const formData = new FormData();
+        formData.append('file', arquivo);
+        formData.append('aba', aba);
+        formData.append('mesReferencia', dataRef);
+        
+        const response = await fetch('/api/importar-planilha', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        const data = await response.json();
+        
+        if (data.sucesso && data.lancamentos) {
+          const linhasAba: LinhaImportada[] = data.lancamentos.map((l: any, idx: number) => ({
+            id: `import-${aba}-${idx}`,
+            descricao: l.descricao,
+            valor: l.valor,
+            data: l.data,
+            tipo: l.tipo,
+            categoria: detectarCategoria(l.descricao, l.tipo, l.categoria),
+            selecionada: true,
+            confianca: 0.8,
+            original: { descricao: l.descricao, valor: String(l.valor), data: l.data, secao: `${aba} - ${l.secao || ''}` },
+          }));
+          
+          todasLinhas.push(...linhasAba);
+        }
+      }
+      
+      if (todasLinhas.length > 0) {
+        setLinhas(todasLinhas);
+        setStep(3);
+      } else {
+        alert('Não foi possível extrair dados das abas.');
+      }
+    } catch (error) {
+      console.error('Erro ao processar abas:', error);
+      alert('Erro ao processar as abas.');
     }
     
     setLoading(false);
@@ -363,6 +497,26 @@ export default function ImportarPage() {
     ));
   };
 
+  // Trocar tipo entrada <-> saída
+  const alterarTipo = (id: string) => {
+    setLinhas(linhas.map(l => {
+      if (l.id === id) {
+        const novoTipo = l.tipo === 'entrada' ? 'saida' : 'entrada';
+        const novaCategoria = novoTipo === 'entrada' ? 'vendas' : 'outros_despesas';
+        return { ...l, tipo: novoTipo as 'entrada' | 'saida', categoria: novaCategoria as Categoria };
+      }
+      return l;
+    }));
+  };
+
+  // Alterar valor
+  const alterarValor = (id: string, novoValor: string) => {
+    const valorNum = parseFloat(novoValor.replace(',', '.')) || 0;
+    setLinhas(linhas.map(l => 
+      l.id === id ? { ...l, valor: valorNum } : l
+    ));
+  };
+
   // Totais
   const totalEntradas = linhas.filter(l => l.selecionada && l.tipo === 'entrada').reduce((a, l) => a + l.valor, 0);
   const totalSaidas = linhas.filter(l => l.selecionada && l.tipo === 'saida').reduce((a, l) => a + l.valor, 0);
@@ -393,6 +547,100 @@ export default function ImportarPage() {
             </div>
           ))}
         </div>
+
+        {/* Step 0: Seleção de Aba (planilhas com múltiplas abas) */}
+        {step === 0 && (
+          <Card className="text-center py-8">
+            <FileSpreadsheet className="w-16 h-16 mx-auto text-primary-400 mb-4" />
+            <h2 className="text-xl font-semibold text-neutral-900 mb-2">
+              {isOrcamento ? '📊 Planilha de Orçamento Detectada!' : 'Selecione uma Aba'}
+            </h2>
+            <p className="text-neutral-500 mb-6">
+              {isOrcamento 
+                ? 'Cada aba parece ser um mês. Selecione qual deseja importar.' 
+                : 'A planilha tem múltiplas abas. Escolha qual importar.'}
+            </p>
+            
+            <div className="max-w-md mx-auto space-y-4">
+              {/* Seletor de aba */}
+              <div className="text-left">
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Aba da planilha</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {abas.map((aba) => (
+                    <button
+                      key={aba}
+                      onClick={() => setAbaEscolhida(aba)}
+                      className={`p-3 rounded-xl text-sm font-medium transition-all ${
+                        abaEscolhida === aba 
+                          ? 'bg-primary-500 text-white' 
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      }`}
+                    >
+                      {aba}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mês de referência */}
+              {isOrcamento && (
+                <div className="text-left">
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Mês de referência para as datas</label>
+                  <input
+                    type="month"
+                    value={mesReferencia}
+                    onChange={(e) => setMesReferencia(e.target.value)}
+                    className="w-full px-4 py-2 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Os lançamentos serão registrados neste mês
+                  </p>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 pt-4">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setStep(1); setAbas([]); setArquivo(null); }}
+                    className="flex-1 py-3 border border-neutral-200 rounded-xl text-neutral-600 hover:bg-neutral-50"
+                  >
+                    <ArrowLeft className="w-4 h-4 inline mr-2" />
+                    Voltar
+                  </button>
+                  <button
+                    onClick={processarAbaEscolhida}
+                    disabled={!abaEscolhida || loading}
+                    className="flex-1 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 disabled:opacity-50"
+                  >
+                    {loading ? 'Processando...' : 'Processar Aba'}
+                    <ArrowRight className="w-4 h-4 inline ml-2" />
+                  </button>
+                </div>
+                
+                {/* Botão para importar todas as abas */}
+                {isOrcamento && abas.length > 1 && (
+                  <button
+                    onClick={processarTodasAbas}
+                    disabled={loading}
+                    className="w-full py-3 bg-gradient-to-r from-entrada to-entrada-dark text-white rounded-xl font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+                  >
+                    {loading ? 'Processando...' : `⚡ Importar Todas as ${abas.length} Abas de Uma Vez`}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {isOrcamento && (
+              <div className="mt-6 p-4 bg-entrada-light rounded-xl text-left max-w-md mx-auto">
+                <h3 className="font-medium text-entrada-dark mb-2">✨ Importação Inteligente</h3>
+                <p className="text-sm text-entrada-dark">
+                  Detectamos seções como "Gastos Fixos", "Gastos Variáveis" e "Renda". 
+                  Vamos extrair automaticamente os dados de cada seção!
+                </p>
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Step 1: Upload */}
         {step === 1 && (
@@ -498,79 +746,169 @@ export default function ImportarPage() {
         {/* Step 3: Preview */}
         {step === 3 && (
           <div className="space-y-4">
-            {/* Resumo */}
-            <div className="grid grid-cols-3 gap-4">
+            {/* Resumo - Responsivo */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Card className="bg-entrada-light">
-                <p className="text-sm text-neutral-500">Entradas</p>
-                <p className="text-xl font-bold text-entrada-dark">{formatarMoeda(totalEntradas)}</p>
+                <p className="text-xs text-neutral-500">Entradas</p>
+                <p className="text-lg font-bold text-entrada-dark">{formatarMoeda(totalEntradas)}</p>
                 <p className="text-xs text-neutral-500">{linhas.filter(l => l.selecionada && l.tipo === 'entrada').length} itens</p>
               </Card>
               <Card className="bg-saida-light">
-                <p className="text-sm text-neutral-500">Saídas</p>
-                <p className="text-xl font-bold text-saida-dark">{formatarMoeda(totalSaidas)}</p>
+                <p className="text-xs text-neutral-500">Saídas</p>
+                <p className="text-lg font-bold text-saida-dark">{formatarMoeda(totalSaidas)}</p>
                 <p className="text-xs text-neutral-500">{linhas.filter(l => l.selecionada && l.tipo === 'saida').length} itens</p>
               </Card>
               <Card>
-                <p className="text-sm text-neutral-500">Selecionados</p>
-                <p className="text-xl font-bold text-neutral-900">{linhas.filter(l => l.selecionada).length}/{linhas.length}</p>
+                <p className="text-xs text-neutral-500">Selecionados</p>
+                <p className="text-lg font-bold text-neutral-900">{linhas.filter(l => l.selecionada).length}/{linhas.length}</p>
                 <button onClick={toggleTodos} className="text-xs text-primary-600">
                   {linhas.every(l => l.selecionada) ? 'Desmarcar todos' : 'Selecionar todos'}
                 </button>
               </Card>
             </div>
 
-            {/* Lista */}
-            <Card>
-              <div className="max-h-96 overflow-y-auto space-y-2">
+            {/* Lista - Responsiva: Cards no mobile, Tabela no desktop */}
+            <Card className="p-0">
+              {/* Mobile: Cards */}
+              <div className="lg:hidden max-h-[500px] overflow-y-auto p-3 space-y-2">
                 {linhas.map((linha) => (
                   <div 
                     key={linha.id}
-                    className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${
-                      linha.selecionada ? 'bg-neutral-50' : 'bg-neutral-100 opacity-50'
-                    }`}
+                    className={`p-3 rounded-xl border ${linha.selecionada ? 'border-primary-200 bg-white' : 'border-neutral-100 bg-neutral-50 opacity-50'}`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={linha.selecionada}
-                      onChange={() => toggleSelecao(linha.id)}
-                      className="w-5 h-5 rounded border-neutral-300 text-primary-600"
-                    />
-                    
-                    <div className={`p-2 rounded-lg ${linha.tipo === 'entrada' ? 'bg-entrada-light' : 'bg-saida-light'}`}>
-                      {linha.tipo === 'entrada' ? '↑' : '↓'}
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={linha.selecionada}
+                        onChange={() => toggleSelecao(linha.id)}
+                        className="w-5 h-5 mt-1 rounded border-neutral-300 text-primary-600 flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium text-neutral-900 truncate text-sm">{linha.descricao}</p>
+                          <button
+                            onClick={() => alterarTipo(linha.id)}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                              linha.tipo === 'entrada' 
+                                ? 'bg-entrada-light text-entrada-dark' 
+                                : 'bg-saida-light text-saida-dark'
+                            }`}
+                          >
+                            {linha.tipo === 'entrada' ? '↑' : '↓'}
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between mt-2 gap-2">
+                          <span className="text-xs text-neutral-500">{formatarDataCurta(linha.data)}</span>
+                          <span className={`text-sm font-bold ${linha.tipo === 'entrada' ? 'text-entrada-dark' : 'text-saida-dark'}`}>
+                            R$ {linha.valor.toFixed(2).replace('.', ',')}
+                          </span>
+                        </div>
+                        <select
+                          value={linha.categoria}
+                          onChange={(e) => alterarCategoria(linha.id, e.target.value as Categoria)}
+                          className="w-full mt-2 px-2 py-1.5 text-xs border border-neutral-200 rounded-lg"
+                        >
+                          {Object.entries(CATEGORIAS_BASE)
+                            .filter(([_, c]) => c.tipo === linha.tipo)
+                            .map(([key, cat]) => (
+                              <option key={key} value={key}>{cat.icone} {cat.label}</option>
+                            ))}
+                        </select>
+                      </div>
                     </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-neutral-900 truncate">{linha.descricao}</p>
-                      <p className="text-sm text-neutral-500">{formatarDataCurta(linha.data)}</p>
-                    </div>
-                    
-                    <Select
-                      value={linha.categoria}
-                      onChange={(e) => alterarCategoria(linha.id, e.target.value as Categoria)}
-                      options={Object.entries(CATEGORIAS_BASE)
-                        .filter(([_, c]) => c.tipo === linha.tipo)
-                        .map(([key, cat]) => ({
-                          value: key,
-                          label: `${cat.icone} ${cat.label}`,
-                        }))}
-                    />
-                    
-                    {linha.confianca < 0.7 && (
-                      <Badge variant="alerta" className="text-xs">Revisar</Badge>
-                    )}
-                    
-                    <p className={`font-bold w-28 text-right ${linha.tipo === 'entrada' ? 'text-entrada-dark' : 'text-saida-dark'}`}>
-                      {formatarMoeda(linha.valor)}
-                    </p>
                   </div>
                 ))}
+              </div>
+
+              {/* Desktop: Tabela */}
+              <div className="hidden lg:block max-h-[600px] overflow-y-auto">
+                <table className="w-full">
+                  <thead className="bg-neutral-50 sticky top-0">
+                    <tr className="text-left text-sm text-neutral-500">
+                      <th className="p-3 w-10"></th>
+                      <th className="p-3 w-16 text-center">Tipo</th>
+                      <th className="p-3">Descrição</th>
+                      <th className="p-3 w-28">Data</th>
+                      <th className="p-3 w-48">Categoria</th>
+                      <th className="p-3 w-36 text-right">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {linhas.map((linha) => (
+                      <tr 
+                        key={linha.id}
+                        className={`border-b border-neutral-100 hover:bg-neutral-50 transition-colors ${
+                          !linha.selecionada && 'opacity-40'
+                        }`}
+                      >
+                        <td className="p-3">
+                          <input
+                            type="checkbox"
+                            checked={linha.selecionada}
+                            onChange={() => toggleSelecao(linha.id)}
+                            className="w-5 h-5 rounded border-neutral-300 text-primary-600"
+                          />
+                        </td>
+                        <td className="p-3 text-center">
+                          <button
+                            onClick={() => alterarTipo(linha.id)}
+                            className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold transition-all hover:scale-110 ${
+                              linha.tipo === 'entrada' 
+                                ? 'bg-entrada-light text-entrada-dark hover:bg-entrada hover:text-white' 
+                                : 'bg-saida-light text-saida-dark hover:bg-saida hover:text-white'
+                            }`}
+                            title={`Clique para trocar para ${linha.tipo === 'entrada' ? 'Saída' : 'Entrada'}`}
+                          >
+                            {linha.tipo === 'entrada' ? '↑' : '↓'}
+                          </button>
+                        </td>
+                        <td className="p-3">
+                          <p className="font-medium text-neutral-900">{linha.descricao}</p>
+                          {linha.original?.secao && (
+                            <p className="text-xs text-neutral-400">{linha.original.secao}</p>
+                          )}
+                        </td>
+                        <td className="p-3 text-sm text-neutral-500">
+                          {formatarDataCurta(linha.data)}
+                        </td>
+                        <td className="p-3">
+                          <select
+                            value={linha.categoria}
+                            onChange={(e) => alterarCategoria(linha.id, e.target.value as Categoria)}
+                            className="w-full px-2 py-1.5 text-sm border border-neutral-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                          >
+                            {Object.entries(CATEGORIAS_BASE)
+                              .filter(([_, c]) => c.tipo === linha.tipo)
+                              .map(([key, cat]) => (
+                                <option key={key} value={key}>
+                                  {cat.icone} {cat.label}
+                                </option>
+                              ))}
+                          </select>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-sm text-neutral-400">R$</span>
+                            <input
+                              type="text"
+                              value={linha.valor.toFixed(2).replace('.', ',')}
+                              onChange={(e) => alterarValor(linha.id, e.target.value)}
+                              className={`w-24 px-2 py-1.5 text-right text-sm font-bold border border-neutral-200 rounded-lg focus:ring-2 focus:ring-primary-500 ${
+                                linha.tipo === 'entrada' ? 'text-entrada-dark' : 'text-saida-dark'
+                              }`}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </Card>
 
             {/* Ações */}
             <div className="flex items-center justify-between">
-              <Button variant="ghost" onClick={() => setStep(2)}>
+              <Button variant="ghost" onClick={() => { setStep(abas.length > 1 ? 0 : 1); }}>
                 <ArrowLeft className="w-4 h-4" />
                 Voltar
               </Button>

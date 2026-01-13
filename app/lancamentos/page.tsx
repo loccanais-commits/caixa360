@@ -77,7 +77,20 @@ export default function LancamentosPage() {
   }, [dataInicio, dataFim]);
 
   async function carregarDados() {
-    setLoading(true);
+    // Se já tem dados em cache (localStorage), mostrar imediatamente
+    const cachedData = localStorage.getItem('caixa360_lancamentos_cache');
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        if (parsed.lancamentos) setLancamentos(parsed.lancamentos);
+        if (parsed.fornecedores) setFornecedores(parsed.fornecedores);
+        if (parsed.empresaId) setEmpresaId(parsed.empresaId);
+        // Não mostra loading se tem cache
+        setLoading(false);
+      } catch (e) {}
+    } else {
+      setLoading(true);
+    }
     
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -118,6 +131,14 @@ export default function LancamentosPage() {
       .order('data_vencimento', { ascending: true });
     
     setAReceber(contasReceber || []);
+    
+    // Salvar cache
+    localStorage.setItem('caixa360_lancamentos_cache', JSON.stringify({
+      lancamentos: lancs || [],
+      fornecedores: forns || [],
+      empresaId: empresa.id,
+      timestamp: Date.now()
+    }));
     
     setLoading(false);
   }
@@ -233,7 +254,7 @@ export default function LancamentosPage() {
   const entradasFiltradas = lancamentosFiltrados.filter(l => l.tipo === 'entrada').reduce((a, l) => a + Number(l.valor), 0);
   const saidasFiltradas = lancamentosFiltrados.filter(l => l.tipo === 'saida').reduce((a, l) => a + Number(l.valor), 0);
 
-  if (loading) {
+  if (loading && lancamentos.length === 0) {
     return <AppLayout><Loading /></AppLayout>;
   }
 
@@ -246,32 +267,22 @@ export default function LancamentosPage() {
             <h1 className="text-2xl font-bold text-neutral-900">Lançamentos</h1>
             <p className="text-neutral-500">Registre suas entradas e saídas</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="entrada" onClick={() => abrirNovo('entrada')}>
-              <ArrowUpCircle className="w-4 h-4" />
-              Entrada
-            </Button>
-            <Button variant="saida" onClick={() => abrirNovo('saida')}>
-              <ArrowDownCircle className="w-4 h-4" />
-              Saída
-            </Button>
-          </div>
         </div>
 
-        {/* Resumo */}
+        {/* Resumo - Responsivo */}
         <Card className="bg-gradient-to-r from-neutral-50 to-white">
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="p-3 bg-entrada-light/50 rounded-xl">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
+            <div className="p-3 bg-entrada-light/50 rounded-xl flex sm:block items-center justify-between">
               <p className="text-xs text-neutral-500">Total Entradas</p>
-              <p className="text-base sm:text-lg font-bold text-entrada-dark">+{formatarMoeda(entradasFiltradas)}</p>
+              <p className="text-sm sm:text-lg font-bold text-entrada-dark">+{formatarMoeda(entradasFiltradas)}</p>
             </div>
-            <div className="p-3 bg-saida-light/50 rounded-xl">
+            <div className="p-3 bg-saida-light/50 rounded-xl flex sm:block items-center justify-between">
               <p className="text-xs text-neutral-500">Total Saídas</p>
-              <p className="text-base sm:text-lg font-bold text-saida-dark">-{formatarMoeda(saidasFiltradas)}</p>
+              <p className="text-sm sm:text-lg font-bold text-saida-dark">-{formatarMoeda(saidasFiltradas)}</p>
             </div>
-            <div className={`p-3 rounded-xl ${entradasFiltradas - saidasFiltradas >= 0 ? 'bg-entrada-light/50' : 'bg-saida-light/50'}`}>
+            <div className={`p-3 rounded-xl flex sm:block items-center justify-between ${entradasFiltradas - saidasFiltradas >= 0 ? 'bg-entrada-light/50' : 'bg-saida-light/50'}`}>
               <p className="text-xs text-neutral-500">Saldo</p>
-              <p className={`text-base sm:text-lg font-bold ${entradasFiltradas - saidasFiltradas >= 0 ? 'text-entrada-dark' : 'text-saida-dark'}`}>
+              <p className={`text-sm sm:text-lg font-bold ${entradasFiltradas - saidasFiltradas >= 0 ? 'text-entrada-dark' : 'text-saida-dark'}`}>
                 {formatarMoeda(entradasFiltradas - saidasFiltradas)}
               </p>
             </div>
@@ -426,46 +437,54 @@ export default function LancamentosPage() {
         {/* Lista */}
         <Card>
           {lancamentosFiltrados.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {lancamentosFiltrados.map((lanc) => (
                 <div 
                   key={lanc.id}
-                  className="flex items-center justify-between p-3 sm:p-4 bg-neutral-50 rounded-xl hover:bg-neutral-100 transition-colors"
+                  className="p-3 bg-neutral-50 rounded-xl hover:bg-neutral-100 transition-colors"
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className={`p-2 sm:p-3 rounded-xl flex-shrink-0 ${lanc.tipo === 'entrada' ? 'bg-entrada-light' : 'bg-saida-light'}`}>
+                  {/* Layout Mobile: Stack vertical */}
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-xl flex-shrink-0 ${lanc.tipo === 'entrada' ? 'bg-entrada-light' : 'bg-saida-light'}`}>
                       {lanc.tipo === 'entrada' 
-                        ? <ArrowUpCircle className="w-4 h-4 sm:w-5 sm:h-5 text-entrada-dark" />
-                        : <ArrowDownCircle className="w-4 h-4 sm:w-5 sm:h-5 text-saida-dark" />
+                        ? <ArrowUpCircle className="w-4 h-4 text-entrada-dark" />
+                        : <ArrowDownCircle className="w-4 h-4 text-saida-dark" />
                       }
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-neutral-900 truncate">{lanc.descricao}</p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <span className="text-xs text-neutral-500">{formatarDataCurta(lanc.data)}</span>
-                        <Badge variant={lanc.tipo === 'entrada' ? 'entrada' : 'saida'} className="text-xs">
-                          {CATEGORIAS_BASE[lanc.categoria as keyof typeof CATEGORIAS_BASE]?.label || lanc.categoria}
-                        </Badge>
+                    
+                    {/* Conteúdo principal */}
+                    <div className="flex-1 min-w-0">
+                      {/* Descrição */}
+                      <p className="font-medium text-neutral-900 text-sm line-clamp-2">{lanc.descricao}</p>
+                      
+                      {/* Valor em linha separada */}
+                      <p className={`text-base font-bold mt-1 ${lanc.tipo === 'entrada' ? 'text-entrada-dark' : 'text-saida-dark'}`}>
+                        {lanc.tipo === 'entrada' ? '+' : '-'}{formatarMoeda(Number(lanc.valor))}
+                      </p>
+                      
+                      {/* Meta info e ações */}
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-neutral-500">{formatarDataCurta(lanc.data)}</span>
+                          <Badge variant={lanc.tipo === 'entrada' ? 'entrada' : 'saida'} className="text-xs">
+                            {CATEGORIAS_BASE[lanc.categoria as keyof typeof CATEGORIAS_BASE]?.label || lanc.categoria}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-1">
+                          <button 
+                            onClick={() => abrirEdicao(lanc)}
+                            className="p-1.5 hover:bg-neutral-200 rounded-lg transition-colors"
+                          >
+                            <Edit className="w-4 h-4 text-neutral-500" />
+                          </button>
+                          <button 
+                            onClick={() => handleExcluir(lanc.id)}
+                            className="p-1.5 hover:bg-saida-light rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4 text-saida" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-                    <p className={`text-sm sm:text-lg font-bold ${lanc.tipo === 'entrada' ? 'text-entrada-dark' : 'text-saida-dark'}`}>
-                      {lanc.tipo === 'entrada' ? '+' : '-'}{formatarMoeda(Number(lanc.valor))}
-                    </p>
-                    <div className="flex gap-1">
-                      <button 
-                        onClick={() => abrirEdicao(lanc)}
-                        className="p-1.5 sm:p-2 hover:bg-neutral-200 rounded-lg transition-colors"
-                      >
-                        <Edit className="w-4 h-4 text-neutral-500" />
-                      </button>
-                      <button 
-                        onClick={() => handleExcluir(lanc.id)}
-                        className="p-1.5 sm:p-2 hover:bg-saida-light rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4 text-saida" />
-                      </button>
                     </div>
                   </div>
                 </div>

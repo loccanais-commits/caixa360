@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { texto, fornecedores, categoriasPersonalizadas } = await request.json();
+    const { texto, fornecedores, categoriasPersonalizadas, produtos } = await request.json();
 
     if (!texto) {
       return NextResponse.json({ error: 'Texto não fornecido' }, { status: 400 });
@@ -16,7 +16,12 @@ export async function POST(request: NextRequest) {
 
     // Preparar lista de fornecedores para o prompt
     const listaFornecedores = fornecedores && fornecedores.length > 0
-      ? `\nFORNECEDORES/CLIENTES CADASTRADOS:\n${fornecedores.map((f: any) => `- ${f.nome} (id: ${f.id})`).join('\n')}`
+      ? `\nCLIENTES/FORNECEDORES CADASTRADOS:\n${fornecedores.map((f: any) => `- ${f.nome} (id: ${f.id})`).join('\n')}`
+      : '';
+
+    // Preparar lista de produtos/serviços para o prompt COM PREÇOS
+    const listaProdutos = produtos && produtos.length > 0
+      ? `\nPRODUTOS/SERVIÇOS CADASTRADOS (USE O PREÇO QUANDO O USUÁRIO NÃO INFORMAR VALOR):\n${produtos.map((p: any) => `- "${p.nome}" = R$${p.preco} (id: ${p.id}, tipo: ${p.tipo})`).join('\n')}`
       : '';
 
     const hoje = new Date().toISOString().split('T')[0];
@@ -35,33 +40,70 @@ export async function POST(request: NextRequest) {
             content: `Você é um assistente financeiro que extrai lançamentos de texto em português brasileiro.
 Data de hoje: ${hoje}
 
-REGRA PRINCIPAL: Sempre que o usuário mencionar NOMES DE PESSOAS com valores, cada pessoa = uma transação separada!
+REGRA FUNDAMENTAL - USAR PREÇO DO PRODUTO CADASTRADO:
+Se o usuário mencionar um produto/serviço cadastrado SEM informar valor, USE O PREÇO CADASTRADO!
+${listaProdutos}
 
-EXEMPLOS DE MÚLTIPLAS TRANSAÇÕES:
-1. "Recebi 500 reais, 300 da Débora e 200 da Raíssa"
-   → Resultado: 2 transações
-   [{"tipo":"entrada","valor":300,"descricao":"Recebimento de Débora","categoria":"vendas","data":"${hoje}","fornecedor_nome":"Débora"},
-    {"tipo":"entrada","valor":200,"descricao":"Recebimento de Raíssa","categoria":"vendas","data":"${hoje}","fornecedor_nome":"Raíssa"}]
+REGRA DE QUANTIDADE + NOMES:
+Se o usuário disser "Fiz X [produto] para [nome1], [nome2], [nome3]", crie UMA TRANSAÇÃO para CADA pessoa com o preço do produto.
 
-2. "Recebi 20 da Camila e 50 do Wagner por cortar cabelo"
-   → Resultado: 2 transações  
-   [{"tipo":"entrada","valor":20,"descricao":"Corte de cabelo - Camila","categoria":"servicos","data":"${hoje}","fornecedor_nome":"Camila"},
-    {"tipo":"entrada","valor":50,"descricao":"Corte de cabelo - Wagner","categoria":"servicos","data":"${hoje}","fornecedor_nome":"Wagner"}]
+EXEMPLOS IMPORTANTES:
 
-3. "Paguei 50 de luz e 100 de internet"
-   → Resultado: 2 transações
-   [{"tipo":"saida","valor":50,"descricao":"Conta de luz","categoria":"energia","data":"${hoje}","fornecedor_nome":null},
-    {"tipo":"saida","valor":100,"descricao":"Conta de internet","categoria":"internet","data":"${hoje}","fornecedor_nome":null}]
+1. "Hoje eu fiz 5 cortes de cabelo" (SEM mencionar valor nem nomes)
+   → Se "Corte de Cabelo" está cadastrado com preço R$50:
+   → Resultado: 1 transação com valor = 5 × R$50 = R$250, COM campo quantidade
+   {"tipo":"entrada","valor":250,"descricao":"5x Corte de Cabelo","categoria":"servicos","data":"${hoje}","produto_nome":"Corte de Cabelo","quantidade":5}
 
-4. "Gastei 30 no mercado e 45 de gasolina"
-   → Resultado: 2 transações
-   [{"tipo":"saida","valor":30,"descricao":"Compras no mercado","categoria":"outros_despesas","data":"${hoje}","fornecedor_nome":null},
-    {"tipo":"saida","valor":45,"descricao":"Combustível","categoria":"transporte","data":"${hoje}","fornecedor_nome":null}]
+1b. "Hoje eu fiz 5 cortes de cabelo no cartão" (quantidade + forma de pagamento única)
+   → Se "Corte de Cabelo" está cadastrado com preço R$50:
+   → Resultado: 1 transação com valor = 5 × R$50 = R$250, quantidade e forma_pagamento
+   {"tipo":"entrada","valor":250,"descricao":"5x Corte de Cabelo","categoria":"servicos","data":"${hoje}","produto_nome":"Corte de Cabelo","quantidade":5,"forma_pagamento":"cartao"}
 
-QUANDO SEPARAR EM MÚLTIPLAS TRANSAÇÕES:
-- Quando mencionar diferentes pessoas com valores (Débora 300, Raíssa 200)
-- Quando usar "e" conectando itens diferentes (luz e internet)
-- Quando o total = soma das partes (500 = 300 + 200)
+2. "Fiz 3 cortes: da Diana que pagou no pix, do Daniel que pagou no cartão e da Juliet que pagou em dinheiro"
+   → CRÍTICO: Cada pessoa tem uma FORMA DE PAGAMENTO DIFERENTE
+   → Se "Corte de Cabelo" está cadastrado com preço R$50:
+   → Resultado: 3 transações separadas, CADA UMA com sua forma_pagamento específica
+   [{"tipo":"entrada","valor":50,"descricao":"Corte de Cabelo - Diana","categoria":"servicos","data":"${hoje}","fornecedor_nome":"Diana","produto_nome":"Corte de Cabelo","forma_pagamento":"pix"},
+    {"tipo":"entrada","valor":50,"descricao":"Corte de Cabelo - Daniel","categoria":"servicos","data":"${hoje}","fornecedor_nome":"Daniel","produto_nome":"Corte de Cabelo","forma_pagamento":"cartao"},
+    {"tipo":"entrada","valor":50,"descricao":"Corte de Cabelo - Juliet","categoria":"servicos","data":"${hoje}","fornecedor_nome":"Juliet","produto_nome":"Corte de Cabelo","forma_pagamento":"dinheiro"}]
+
+2b. "Fiz 5 cortes do José, da Ana, do Ricardo, do Joanir e da Valéria" (SEM mencionar forma de pagamento)
+   → Se "Corte de Cabelo" está cadastrado com preço R$50:
+   → Resultado: 5 transações, uma para cada pessoa, cada uma R$50
+   [{"tipo":"entrada","valor":50,"descricao":"Corte de Cabelo - José","categoria":"servicos","data":"${hoje}","fornecedor_nome":"José","produto_nome":"Corte de Cabelo"},
+    {"tipo":"entrada","valor":50,"descricao":"Corte de Cabelo - Ana","categoria":"servicos","data":"${hoje}","fornecedor_nome":"Ana","produto_nome":"Corte de Cabelo"},
+    {"tipo":"entrada","valor":50,"descricao":"Corte de Cabelo - Ricardo","categoria":"servicos","data":"${hoje}","fornecedor_nome":"Ricardo","produto_nome":"Corte de Cabelo"},
+    {"tipo":"entrada","valor":50,"descricao":"Corte de Cabelo - Joanir","categoria":"servicos","data":"${hoje}","fornecedor_nome":"Joanir","produto_nome":"Corte de Cabelo"},
+    {"tipo":"entrada","valor":50,"descricao":"Corte de Cabelo - Valéria","categoria":"servicos","data":"${hoje}","fornecedor_nome":"Valéria","produto_nome":"Corte de Cabelo"}]
+
+3. "Recebi 300 da Débora no PIX e 200 da Raíssa no cartão"
+   → Resultado: 2 transações com valores e forma de pagamento
+   [{"tipo":"entrada","valor":300,"descricao":"Recebimento - Débora","categoria":"vendas","data":"${hoje}","fornecedor_nome":"Débora","forma_pagamento":"pix"},
+    {"tipo":"entrada","valor":200,"descricao":"Recebimento - Raíssa","categoria":"vendas","data":"${hoje}","fornecedor_nome":"Raíssa","forma_pagamento":"cartao"}]
+
+4. "Paguei 50 de luz no PIX e 100 de internet no cartão"
+   → Resultado: 2 transações com forma de pagamento
+   [{"tipo":"saida","valor":50,"descricao":"Conta de luz","categoria":"energia","data":"${hoje}","forma_pagamento":"pix"},
+    {"tipo":"saida","valor":100,"descricao":"Conta de internet","categoria":"internet","data":"${hoje}","forma_pagamento":"cartao"}]
+
+5. "Vendi um corte no cartão"
+   → Entrada com forma de pagamento
+   {"tipo":"entrada","valor":30,"descricao":"Corte de Cabelo","categoria":"servicos","data":"${hoje}","produto_nome":"Corte de Cabelo","forma_pagamento":"debito"}
+
+FORMAS DE PAGAMENTO (para ENTRADAS e SAÍDAS):
+- pix: PIX, pix, transferência pix
+- debito: cartão de débito, débito, no débito, maquininha débito
+- credito: cartão de crédito, crédito, no crédito, maquininha crédito, parcelado
+- cartao: cartão (genérico - quando não especifica se é débito ou crédito, use debito)
+- dinheiro: em espécie, cash, dinheiro vivo, dinheiro
+- boleto: boleto bancário, boleto
+- ticket: vale, voucher, vale alimentação, vale refeição
+- transferencia: TED, DOC, transferência bancária
+
+IMPORTANTE: 
+- Se a pessoa diz apenas "cartão" sem especificar, use "debito" como padrão
+- Se a pessoa diz "crédito" ou "parcelado", use "credito"
+- Se a pessoa diz "débito", use "debito"
 
 CATEGORIAS DE ENTRADA:
 - vendas: vendas de produtos
@@ -82,12 +124,16 @@ CATEGORIAS DE SAÍDA:
 - outros_despesas: outros gastos
 ${listaFornecedores}
 
-RESPONDA APENAS JSON. Se for UMA transação, retorne objeto. Se forem MÚLTIPLAS, retorne ARRAY.
+RESPONDA APENAS JSON válido. Se for UMA transação, retorne objeto. Se forem MÚLTIPLAS, retorne ARRAY.
 
-IMPORTANTE: 
-- SEMPRE extraia o valor correto de cada transação
-- Se mencionar pessoas diferentes, SEPARE em transações diferentes
-- Cada pessoa = uma transação com seu valor específico`
+REGRAS CRÍTICAS:
+1. Se mencionar produto cadastrado SEM valor → USE O PREÇO CADASTRADO
+2. Se mencionar quantidade (X cortes, Y vendas) → multiplique pelo preço e INCLUA campo "quantidade" no JSON
+3. Se mencionar nomes de pessoas → crie UMA transação por pessoa
+4. Inclua "produto_nome" quando identificar um produto/serviço cadastrado
+5. Inclua "forma_pagamento" em ENTRADAS E SAÍDAS quando o usuário mencionar como pagou/recebeu (pix, cartão, dinheiro, etc)
+6. Se mencionar "no PIX", "no cartão", "em dinheiro" → sempre extraia a forma de pagamento
+7. SEMPRE inclua o campo "quantidade" quando houver quantidade mencionada (mesmo que seja 1)`
           },
           {
             role: 'user',
@@ -95,7 +141,7 @@ IMPORTANTE:
           }
         ],
         temperature: 0.1,
-        max_tokens: 1000,
+        max_tokens: 2000,
       }),
     });
 
@@ -138,23 +184,58 @@ IMPORTANTE:
         }
       }
 
+      // Tentar encontrar produto/serviço pelo nome
+      let produto_id = null;
+      let precoProduto = null;
+      if (item.produto_nome && produtos && produtos.length > 0) {
+        const nomeBusca = item.produto_nome.toLowerCase();
+        const produtoEncontrado = produtos.find((p: any) => 
+          p.nome.toLowerCase().includes(nomeBusca) || 
+          nomeBusca.includes(p.nome.toLowerCase())
+        );
+        if (produtoEncontrado) {
+          produto_id = produtoEncontrado.id;
+          precoProduto = produtoEncontrado.preco;
+        }
+      }
+
+      // Se não tem valor mas tem produto, usar preço do produto
+      let valorFinal = parseFloat(item.valor) || 0;
+      const quantidade = item.quantidade || 1;
+      if (valorFinal === 0 && precoProduto) {
+        valorFinal = precoProduto * quantidade;
+      }
+
       return {
         tipo: item.tipo === 'entrada' ? 'entrada' : 'saida',
-        valor: parseFloat(item.valor) || 0,
+        valor: valorFinal,
         descricao: item.descricao || 'Lançamento por voz',
         categoria: item.categoria || (item.tipo === 'entrada' ? 'vendas' : 'outros_despesas'),
         data: item.data || hoje,
         fornecedor_id: fornecedor_id,
         fornecedor_nome: item.fornecedor_nome || null,
+        produto_id: produto_id,
+        produto_nome: item.produto_nome || null,
+        forma_pagamento: item.forma_pagamento || null,
+        quantidade: quantidade, // Preservar quantidade
+        preco_unitario: precoProduto || (valorFinal / quantidade), // Preço unitário
       };
     });
 
     // Filtrar transações com valor > 0
     const transacoesValidas = resultadoFinal.filter((t: any) => t.valor > 0);
 
-    // Se for apenas uma transação, retornar objeto simples para compatibilidade
+    // Se for apenas uma transação com quantidade > 1 e SEM nome de cliente
+    // Retornar com flag para perguntar ao usuário
     if (transacoesValidas.length === 1) {
-      return NextResponse.json(transacoesValidas[0]);
+      const t = transacoesValidas[0];
+      if (t.quantidade > 1 && !t.fornecedor_nome) {
+        return NextResponse.json({
+          ...t,
+          perguntarSeparacao: true, // Flag para perguntar se quer separar
+        });
+      }
+      return NextResponse.json(t);
     }
 
     // Se forem múltiplas, retornar array com flag
@@ -165,13 +246,12 @@ IMPORTANTE:
       });
     }
 
-    // Se nenhuma válida, retornar erro
     return NextResponse.json({ 
-      error: 'Não foi possível identificar valores. Tente novamente.' 
+      error: 'Não foi possível identificar valores. Tente novamente.',
     }, { status: 400 });
 
   } catch (error) {
-    console.error('Erro ao processar voz:', error);
+    console.error('Erro no processamento de voz:', error);
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }

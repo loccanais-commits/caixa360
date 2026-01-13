@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardHeader, CardTitle, StatCard, Button, Badge, EmptyState, Loading, Modal } from '@/components/ui';
+import { ExpandableCardList, ExpandableItem } from '@/components/ui/ExpandableCard';
 import { formatarMoeda, formatarDataCurta, formatarPercentual, calcularVariacao } from '@/lib/utils';
 import { Empresa, Lancamento, Conta, CATEGORIAS_BASE } from '@/lib/types';
 import {
@@ -19,7 +20,10 @@ import {
   Sparkles,
   Plus,
   X,
-  Bell
+  Bell,
+  Package,
+  Clock,
+  CheckCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -64,6 +68,7 @@ export default function DashboardPage() {
   const [dadosEvolucao, setDadosEvolucao] = useState<any[]>([]);
   const [dadosCategorias, setDadosCategorias] = useState<any[]>([]);
   const [dadosComparativo, setDadosComparativo] = useState<any[]>([]);
+  const [topProdutos, setTopProdutos] = useState<any[]>([]);
   
   // Modal de alertas
   const [showAlertas, setShowAlertas] = useState(false);
@@ -73,7 +78,32 @@ export default function DashboardPage() {
   }, []);
 
   async function carregarDados() {
-    setLoading(true);
+    // Tentar usar cache primeiro para mostrar dados instantaneamente
+    const cachedData = localStorage.getItem('caixa360_dashboard_cache');
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        // Verificar se cache não é muito antigo (5 minutos)
+        if (parsed.timestamp && Date.now() - parsed.timestamp < 300000) {
+          setEmpresa(parsed.empresa);
+          setTotalEntradas(parsed.totalEntradas || 0);
+          setTotalSaidas(parsed.totalSaidas || 0);
+          setResultado(parsed.resultado || 0);
+          setSaldoAtual(parsed.saldoAtual || 0);
+          setUltimosLancamentos(parsed.ultimosLancamentos || []);
+          setProlaboreRetirado(parsed.prolaboreRetirado || 0);
+          setContasAtrasadas(parsed.contasAtrasadas || []);
+          setProximasContas(parsed.proximasContas || []);
+          // Não mostrar loading se tem cache válido
+          setLoading(false);
+        }
+      } catch (e) {}
+    }
+    
+    // Se não tem cache, mostrar loading
+    if (!cachedData) {
+      setLoading(true);
+    }
     
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -152,6 +182,41 @@ export default function DashboardPage() {
     pontos -= atrasadas.length * 10;
     setSaudeCaixa(Math.max(0, Math.min(100, pontos)));
 
+    // Top 5 Produtos/Serviços mais vendidos
+    const lancamentosComProduto = (lancamentos || []).filter(l => l.produto_id && l.tipo === 'entrada');
+    const vendasPorProduto: Record<string, { nome: string; qtd: number; total: number }> = {};
+    
+    const produtoIds = [...new Set(lancamentosComProduto.map(l => l.produto_id))];
+    if (produtoIds.length > 0) {
+      const { data: produtos } = await supabase
+        .from('produtos')
+        .select('id, nome, tipo')
+        .in('id', produtoIds);
+      
+      const produtosMap: Record<string, any> = {};
+      (produtos || []).forEach(p => { produtosMap[p.id] = p; });
+      
+      lancamentosComProduto.forEach(l => {
+        if (l.produto_id && produtosMap[l.produto_id]) {
+          if (!vendasPorProduto[l.produto_id]) {
+            vendasPorProduto[l.produto_id] = {
+              nome: produtosMap[l.produto_id].nome,
+              qtd: 0,
+              total: 0
+            };
+          }
+          vendasPorProduto[l.produto_id].qtd += 1;
+          vendasPorProduto[l.produto_id].total += Number(l.valor);
+        }
+      });
+      
+      const topProd = Object.values(vendasPorProduto)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+      
+      setTopProdutos(topProd);
+    }
+
     // Preparar dados para gráficos
     prepararDadosGraficos(lancamentos || [], emp.saldo_inicial);
 
@@ -159,6 +224,20 @@ export default function DashboardPage() {
     if (atrasadas.length > 0) {
       setShowAlertas(true);
     }
+
+    // Salvar cache para navegação mais rápida
+    localStorage.setItem('caixa360_dashboard_cache', JSON.stringify({
+      empresa: emp,
+      totalEntradas: entradas,
+      totalSaidas: saidas,
+      resultado: entradas - saidas,
+      saldoAtual: saldo,
+      ultimosLancamentos: (lancamentos || []).slice(0, 5),
+      prolaboreRetirado: totalRetirado,
+      contasAtrasadas: atrasadas,
+      proximasContas: proximasPagar,
+      timestamp: Date.now()
+    }));
 
     setLoading(false);
   }
@@ -278,7 +357,7 @@ export default function DashboardPage() {
     );
   };
 
-  if (loading) {
+  if (loading && !empresa) {
     return (
       <AppLayout>
         <Loading />
@@ -495,7 +574,43 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Contas a Pagar e a Receber */}
+        {/* Top Produtos/Serviços Vendidos */}
+        {topProdutos.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                🏆 Top {topProdutos.length} Produtos/Serviços
+              </CardTitle>
+              <Link href="/produtos" className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1">
+                Ver todos
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </CardHeader>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {topProdutos.map((prod, idx) => (
+                <div key={idx} className={`p-3 rounded-xl ${
+                  idx === 0 ? 'bg-gradient-to-br from-yellow-50 to-amber-100 border-2 border-yellow-200' :
+                  idx === 1 ? 'bg-gradient-to-br from-neutral-50 to-neutral-100 border border-neutral-200' :
+                  idx === 2 ? 'bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200' :
+                  'bg-neutral-50'
+                }`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg font-bold text-neutral-400">#{idx + 1}</span>
+                    <span className="font-medium text-neutral-900 truncate text-sm">{prod.nome}</span>
+                  </div>
+                  <div className="text-xs text-neutral-500">
+                    {prod.qtd} {prod.qtd === 1 ? 'venda' : 'vendas'}
+                  </div>
+                  <div className="text-lg font-bold text-entrada-dark">
+                    {formatarMoeda(prod.total)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {/* Contas a Pagar e a Receber - Expandable Cards */}
         <div className="grid lg:grid-cols-2 gap-4">
           {/* Próximas contas a PAGAR */}
           <Card>
@@ -510,32 +625,44 @@ export default function DashboardPage() {
               </Link>
             </CardHeader>
 
-            {proximasContas.length > 0 ? (
-              <ul className="space-y-2">
-                {proximasContas.map((conta) => (
-                  <li key={conta.id} className="flex items-center justify-between p-2.5 bg-saida-light/30 rounded-xl">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="p-1.5 rounded-lg bg-saida-light flex-shrink-0">
-                        <ArrowDownCircle className="w-3.5 h-3.5 text-saida-dark" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-xs sm:text-sm text-neutral-900 truncate">{conta.descricao}</p>
-                        <p className="text-xs text-neutral-500">{formatarDataCurta(conta.data_vencimento)}</p>
-                      </div>
+            <ExpandableCardList 
+              items={proximasContas.map((conta): ExpandableItem => ({
+                id: conta.id,
+                title: conta.descricao,
+                subtitle: formatarDataCurta(conta.data_vencimento),
+                value: formatarMoeda(Number(conta.valor)),
+                valueColor: 'text-saida-dark',
+                icon: <ArrowDownCircle className="w-4 h-4 text-saida-dark" />,
+                badge: conta.status === 'atrasado' ? 'Atrasado' : undefined,
+                badgeColor: conta.status === 'atrasado' ? 'bg-saida-light text-saida-dark' : undefined,
+                content: () => (
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-500">Categoria:</span>
+                      <span className="font-medium">{CATEGORIAS_BASE[conta.categoria as keyof typeof CATEGORIAS_BASE]?.label || conta.categoria}</span>
                     </div>
-                    <p className="font-semibold text-sm text-saida-dark flex-shrink-0 ml-2">
-                      {formatarMoeda(Number(conta.valor))}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState
-                icon={<Calendar className="w-6 h-6" />}
-                title="Nenhuma conta a pagar"
-                description="Tudo em dia! 🎉"
-              />
-            )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-500">Vencimento:</span>
+                      <span className="font-medium">{formatarDataCurta(conta.data_vencimento)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-500">Status:</span>
+                      <Badge variant={conta.status === 'atrasado' ? 'saida' : 'alerta'}>{conta.status}</Badge>
+                    </div>
+                    {conta.observacao && (
+                      <div className="pt-2 border-t border-neutral-100">
+                        <p className="text-sm text-neutral-500">{conta.observacao}</p>
+                      </div>
+                    )}
+                  </div>
+                ),
+                ctaText: '✅ Marcar Pago',
+                ctaAction: () => window.location.href = `/contas?tipo=saida&pagar=${conta.id}`,
+                cta2Text: '📋 Ver Detalhes',
+                cta2Action: () => window.location.href = '/contas?tipo=saida'
+              }))}
+              emptyMessage="Tudo em dia! 🎉 Nenhuma conta a pagar"
+            />
           </Card>
 
           {/* A RECEBER */}
@@ -551,38 +678,42 @@ export default function DashboardPage() {
               </Link>
             </CardHeader>
 
-            {aReceber.length > 0 ? (
-              <ul className="space-y-2">
-                {aReceber.map((conta) => (
-                  <li key={conta.id} className="flex items-center justify-between p-2.5 bg-entrada-light/30 rounded-xl">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="p-1.5 rounded-lg bg-entrada-light flex-shrink-0">
-                        <ArrowUpCircle className="w-3.5 h-3.5 text-entrada-dark" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-xs sm:text-sm text-neutral-900 truncate">{conta.descricao}</p>
-                        <p className="text-xs text-neutral-500">{formatarDataCurta(conta.data_vencimento)}</p>
-                      </div>
+            <ExpandableCardList 
+              items={aReceber.map((conta): ExpandableItem => ({
+                id: conta.id,
+                title: conta.descricao,
+                subtitle: formatarDataCurta(conta.data_vencimento),
+                value: formatarMoeda(Number(conta.valor)),
+                valueColor: 'text-entrada-dark',
+                icon: <ArrowUpCircle className="w-4 h-4 text-entrada-dark" />,
+                content: () => (
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-500">Categoria:</span>
+                      <span className="font-medium">{CATEGORIAS_BASE[conta.categoria as keyof typeof CATEGORIAS_BASE]?.label || conta.categoria}</span>
                     </div>
-                    <p className="font-semibold text-sm text-entrada-dark flex-shrink-0 ml-2">
-                      {formatarMoeda(Number(conta.valor))}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState
-                icon={<ArrowUpCircle className="w-6 h-6" />}
-                title="Nenhum recebimento"
-                description="Sem entradas previstas"
-              />
-            )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-500">Previsão:</span>
+                      <span className="font-medium">{formatarDataCurta(conta.data_vencimento)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-500">Status:</span>
+                      <Badge variant="entrada">{conta.status}</Badge>
+                    </div>
+                  </div>
+                ),
+                ctaText: '✅ Marcar Recebido',
+                ctaAction: () => window.location.href = `/contas?tipo=entrada&receber=${conta.id}`,
+                cta2Text: '📋 Ver Detalhes',
+                cta2Action: () => window.location.href = '/contas?tipo=entrada'
+              }))}
+              emptyMessage="Sem recebimentos previstos"
+            />
           </Card>
         </div>
 
-        {/* Últimos Lançamentos */}
+        {/* Últimos Lançamentos - Expandable Cards */}
         <div className="grid lg:grid-cols-1 gap-6">
-          {/* Últimos lançamentos */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -595,43 +726,52 @@ export default function DashboardPage() {
               </Link>
             </CardHeader>
 
-            {ultimosLancamentos.length > 0 ? (
-              <ul className="space-y-3">
-                {ultimosLancamentos.map((lanc) => (
-                  <li key={lanc.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${lanc.tipo === 'entrada' ? 'bg-entrada-light' : 'bg-saida-light'}`}>
-                        {lanc.tipo === 'entrada'
-                          ? <ArrowUpCircle className="w-4 h-4 text-entrada-dark" />
-                          : <ArrowDownCircle className="w-4 h-4 text-saida-dark" />
-                        }
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm text-neutral-900">{lanc.descricao}</p>
-                        <p className="text-xs text-neutral-500">{formatarDataCurta(lanc.data)}</p>
-                      </div>
+            <ExpandableCardList 
+              items={ultimosLancamentos.map((lanc): ExpandableItem => ({
+                id: lanc.id,
+                title: lanc.descricao,
+                subtitle: formatarDataCurta(lanc.data),
+                value: `${lanc.tipo === 'entrada' ? '+' : '-'}${formatarMoeda(Number(lanc.valor))}`,
+                valueColor: lanc.tipo === 'entrada' ? 'text-entrada-dark' : 'text-saida-dark',
+                icon: lanc.tipo === 'entrada' 
+                  ? <ArrowUpCircle className="w-4 h-4 text-entrada-dark" />
+                  : <ArrowDownCircle className="w-4 h-4 text-saida-dark" />,
+                badge: CATEGORIAS_BASE[lanc.categoria as keyof typeof CATEGORIAS_BASE]?.label,
+                badgeColor: lanc.tipo === 'entrada' ? 'bg-entrada-light text-entrada-dark' : 'bg-saida-light text-saida-dark',
+                content: () => (
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-500">Tipo:</span>
+                      <Badge variant={lanc.tipo === 'entrada' ? 'entrada' : 'saida'}>
+                        {lanc.tipo === 'entrada' ? 'Entrada' : 'Saída'}
+                      </Badge>
                     </div>
-                    <p className={`font-semibold ${lanc.tipo === 'entrada' ? 'text-entrada-dark' : 'text-saida-dark'}`}>
-                      {lanc.tipo === 'entrada' ? '+' : '-'}{formatarMoeda(Number(lanc.valor))}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState
-                icon={<TrendingUp className="w-8 h-8" />}
-                title="Nenhum lançamento"
-                description="Comece registrando suas entradas e saídas"
-                action={
-                  <Link href="/lancamentos">
-                    <Button variant="primary" size="sm">
-                      <Plus className="w-4 h-4" />
-                      Novo lançamento
-                    </Button>
-                  </Link>
-                }
-              />
-            )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-500">Categoria:</span>
+                      <span className="font-medium">{CATEGORIAS_BASE[lanc.categoria as keyof typeof CATEGORIAS_BASE]?.label || lanc.categoria}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-500">Data:</span>
+                      <span className="font-medium">{formatarDataCurta(lanc.data)}</span>
+                    </div>
+                    {lanc.forma_pagamento && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-neutral-500">Pagamento:</span>
+                        <span className="font-medium capitalize">{lanc.forma_pagamento}</span>
+                      </div>
+                    )}
+                    {lanc.observacao && (
+                      <div className="pt-2 border-t border-neutral-100">
+                        <p className="text-sm text-neutral-500">{lanc.observacao}</p>
+                      </div>
+                    )}
+                  </div>
+                ),
+                ctaText: '📝 Ver Detalhes',
+                ctaAction: () => window.location.href = '/lancamentos'
+              }))}
+              emptyMessage="Nenhum lançamento ainda. Comece registrando suas entradas e saídas!"
+            />
           </Card>
         </div>
       </div>

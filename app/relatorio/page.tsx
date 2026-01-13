@@ -375,38 +375,38 @@ export default function RelatorioPage() {
           </div>
         </Card>
 
-        {/* Resumo */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Resumo - Responsivo: 1 coluna mobile, 2 tablet, 4 desktop */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Card className="bg-gradient-to-br from-entrada-light to-emerald-50">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-entrada/10 rounded-lg">
+              <div className="p-2 bg-entrada/10 rounded-lg flex-shrink-0">
                 <TrendingUp className="w-5 h-5 text-entrada-dark" />
               </div>
-              <div>
-                <p className="text-sm text-neutral-500">Entradas</p>
-                <p className="text-xl font-bold text-entrada-dark">{formatarMoeda(totalEntradas)}</p>
+              <div className="min-w-0">
+                <p className="text-xs text-neutral-500">Entradas</p>
+                <p className="text-lg font-bold text-entrada-dark truncate">{formatarMoeda(totalEntradas)}</p>
               </div>
             </div>
           </Card>
           <Card className="bg-gradient-to-br from-saida-light to-red-50">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-saida/10 rounded-lg">
+              <div className="p-2 bg-saida/10 rounded-lg flex-shrink-0">
                 <TrendingDown className="w-5 h-5 text-saida-dark" />
               </div>
-              <div>
-                <p className="text-sm text-neutral-500">Saídas</p>
-                <p className="text-xl font-bold text-saida-dark">{formatarMoeda(totalSaidas)}</p>
+              <div className="min-w-0">
+                <p className="text-xs text-neutral-500">Saídas</p>
+                <p className="text-lg font-bold text-saida-dark truncate">{formatarMoeda(totalSaidas)}</p>
               </div>
             </div>
           </Card>
           <Card className={`bg-gradient-to-br ${resultado >= 0 ? 'from-entrada-light to-emerald-50' : 'from-saida-light to-red-50'}`}>
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${resultado >= 0 ? 'bg-entrada/10' : 'bg-saida/10'}`}>
+              <div className={`p-2 rounded-lg flex-shrink-0 ${resultado >= 0 ? 'bg-entrada/10' : 'bg-saida/10'}`}>
                 {resultado >= 0 ? <TrendingUp className="w-5 h-5 text-entrada-dark" /> : <TrendingDown className="w-5 h-5 text-saida-dark" />}
               </div>
-              <div>
-                <p className="text-sm text-neutral-500">Resultado</p>
-                <p className={`text-xl font-bold ${resultado >= 0 ? 'text-entrada-dark' : 'text-saida-dark'}`}>
+              <div className="min-w-0">
+                <p className="text-xs text-neutral-500">Resultado</p>
+                <p className={`text-lg font-bold truncate ${resultado >= 0 ? 'text-entrada-dark' : 'text-saida-dark'}`}>
                   {formatarMoeda(resultado)}
                 </p>
               </div>
@@ -414,12 +414,12 @@ export default function RelatorioPage() {
           </Card>
           <Card>
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-neutral-100 rounded-lg">
+              <div className="p-2 bg-neutral-100 rounded-lg flex-shrink-0">
                 <PieChart className="w-5 h-5 text-neutral-600" />
               </div>
-              <div>
-                <p className="text-sm text-neutral-500">Margem</p>
-                <p className="text-xl font-bold text-neutral-900">
+              <div className="min-w-0">
+                <p className="text-xs text-neutral-500">Margem</p>
+                <p className="text-lg font-bold text-neutral-900">
                   {totalEntradas > 0 ? formatarPercentual((resultado / totalEntradas) * 100) : '0%'}
                 </p>
               </div>
@@ -442,8 +442,8 @@ export default function RelatorioPage() {
           </Card>
         )}
 
-        {/* Gráficos */}
-        <div className="grid lg:grid-cols-2 gap-6">
+        {/* Gráficos - Stack no mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Evolução */}
           <Card>
             <CardHeader>

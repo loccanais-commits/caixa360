@@ -12,8 +12,8 @@ export type StatusConta = 'pendente' | 'pago' | 'atrasado' | 'cancelado';
 export const CATEGORIAS_BASE = {
   // Entradas
   vendas: { label: 'Vendas', tipo: 'entrada' as TipoLancamento, icone: '💰' },
-  servicos: { label: 'Serviços', tipo: 'entrada' as TipoLancamento, icone: '✂️' },
-  freela_entrada: { label: 'Freela/Jobs', tipo: 'entrada' as TipoLancamento, icone: '💼' },
+  servicos: { label: 'Serviços', tipo: 'entrada' as TipoLancamento, icone: '💼' },
+  freela_entrada: { label: 'Freela/Jobs', tipo: 'entrada' as TipoLancamento, icone: '🎯' },
   outros_receitas: { label: 'Outras Receitas', tipo: 'entrada' as TipoLancamento, icone: '📥' },
   
   // Saídas gerais
@@ -60,6 +60,19 @@ export type CategoriaBase = keyof typeof CATEGORIAS_BASE;
 export type CategoriaEspecifica = keyof typeof CATEGORIAS_ESPECIFICAS;
 export type Categoria = CategoriaBase | CategoriaEspecifica;
 
+// ==================== FORMAS DE PAGAMENTO ====================
+
+export type FormaPagamento = 'pix' | 'cartao' | 'dinheiro' | 'boleto' | 'ticket' | 'transferencia' | null;
+
+export const FORMAS_PAGAMENTO = {
+  pix: { label: 'PIX', icone: '📱' },
+  cartao: { label: 'Cartão', icone: '💳' },
+  dinheiro: { label: 'Dinheiro', icone: '💵' },
+  boleto: { label: 'Boleto', icone: '📄' },
+  ticket: { label: 'Ticket/Vale', icone: '🎟️' },
+  transferencia: { label: 'Transferência', icone: '🏦' },
+};
+
 // ==================== MODELOS DO BANCO ====================
 
 export interface Usuario {
@@ -95,6 +108,8 @@ export interface Lancamento {
   categoria: Categoria | string; // Pode ser categoria personalizada
   data: string;
   fornecedor_id?: string;
+  produto_id?: string;
+  forma_pagamento?: FormaPagamento;
   observacao?: string;
   moeda?: string;
   taxa_cambio?: number;
@@ -113,6 +128,7 @@ export interface Conta {
   data_pagamento?: string;
   status: StatusConta;
   fornecedor_id?: string;
+  forma_pagamento?: FormaPagamento;
   recorrente: boolean;
   observacao?: string;
   moeda?: string;
@@ -133,6 +149,24 @@ export interface Fornecedor {
   created_at: string;
 }
 
+export type TipoProduto = 'produto' | 'servico';
+
+export interface Produto {
+  id: string;
+  empresa_id: string;
+  nome: string;
+  tipo: TipoProduto;
+  preco: number;
+  custo?: number;
+  estoque?: number;
+  estoque_minimo?: number;
+  categoria?: string;
+  descricao?: string;
+  fornecedor_id?: string; // Fornecedor do produto
+  ativo: boolean;
+  created_at: string;
+}
+
 export interface RetiradaProlabore {
   id: string;
   empresa_id: string;
@@ -149,6 +183,11 @@ export interface Configuracao {
   alerta_dias_antes: number;
   notificacoes_push: boolean;
   dia_resumo_semanal: number; // 0 = domingo, 1 = segunda, 6 = sábado
+  // Taxas padrão por forma de pagamento
+  taxa_pix?: number; // Valor fixo em R$
+  taxa_cartao?: number; // Percentual (ex: 3.5 = 3.5%)
+  taxa_boleto?: number; // Valor fixo em R$
+  taxa_ticket?: number; // Percentual
   created_at: string;
   updated_at: string;
 }
