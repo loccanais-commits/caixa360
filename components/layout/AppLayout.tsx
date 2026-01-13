@@ -428,7 +428,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               </div>
 
               {/* Ações Rápidas */}
-              <div className="flex items-center gap-2 lg:mt-0 mt-16 w-full lg:w-auto justify-center lg:justify-end">
+              <div className="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end">
                 <button 
                   onClick={() => { setTipoLancamento('entrada'); setShowLancamentoModal(true); }} 
                   className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl font-medium text-sm bg-entrada-light text-entrada-dark hover:bg-entrada hover:text-white transition-all shadow-sm hover:shadow-md"
@@ -616,7 +616,7 @@ function VoiceButton({ empresaId, onSuccess }: { empresaId: string; onSuccess: (
       
       if (editFormaPagamento === 'pix' && taxasPadrao.taxa_pix) {
         taxa = taxasPadrao.taxa_pix; // Valor fixo
-      } else if (editFormaPagamento === 'cartao' && taxasPadrao.taxa_cartao) {
+      } else if (['credito', 'debito'].includes(editFormaPagamento) && taxasPadrao.taxa_cartao) {
         taxa = (valor * taxasPadrao.taxa_cartao) / 100; // Percentual
       } else if (editFormaPagamento === 'boleto' && taxasPadrao.taxa_boleto) {
         taxa = taxasPadrao.taxa_boleto; // Valor fixo
@@ -963,31 +963,26 @@ function VoiceButton({ empresaId, onSuccess }: { empresaId: string; onSuccess: (
 
   return (
     <>
-      {/* Botão de gravação */}
+      {/* Botão de gravação - Estilo Dark Futurista */}
       {isRecording ? (
         <button 
           onClick={cancelRecording}
-          className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center z-40 bg-saida animate-pulse"
+          className="voice-btn recording fixed bottom-24 sm:bottom-6 right-4 sm:right-6 z-40"
           title="Cancelar gravação"
         >
-          <X className="w-6 h-6 text-white" />
+          <X className="w-6 h-6" />
         </button>
       ) : (
         <button 
           onClick={startRecording}
           disabled={isProcessing}
-          className={clsx(
-            "fixed bottom-20 lg:bottom-6 right-4 lg:right-6 w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center z-40",
-            isProcessing 
-              ? "bg-alerta"
-              : "bg-gradient-to-r from-primary-500 to-secondary-500"
-          )}
+          className="voice-btn fixed bottom-24 sm:bottom-6 right-4 sm:right-6 z-40"
           title="Lançar por voz"
         >
           {isProcessing ? (
-            <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-neutral-400/30 border-t-neutral-400 rounded-full animate-spin" />
           ) : (
-            <Mic className="w-6 h-6 text-white" />
+            <Mic className="w-6 h-6" />
           )}
         </button>
       )}
@@ -1076,14 +1071,13 @@ function VoiceButton({ empresaId, onSuccess }: { empresaId: string; onSuccess: (
                 <label className="text-xs text-neutral-500 mb-1.5 block">Forma de Pagamento</label>
                 <div className="grid grid-cols-4 gap-1.5">
                   {[
-                    { value: '', label: '-', icone: '❌' },
-                    { value: 'pix', label: 'PIX', icone: '📱' },
-                    { value: 'debito', label: 'Débito', icone: '💳' },
-                    { value: 'credito', label: 'Crédito', icone: '💳' },
-                    { value: 'dinheiro', label: 'Dinheiro', icone: '💵' },
-                    { value: 'boleto', label: 'Boleto', icone: '📄' },
-                    { value: 'ticket', label: 'Ticket', icone: '🎟️' },
-                    { value: 'transferencia', label: 'TED/DOC', icone: '🏦' },
+                    { value: '', label: '-', icone: '❌', cor: '' },
+                    { value: 'pix', label: 'PIX', icone: '📱', cor: '' },
+                    { value: 'credito', label: 'Crédito', icone: '💳', cor: 'text-saida' },
+                    { value: 'debito', label: 'Débito', icone: '💳', cor: 'text-primary-600' },
+                    { value: 'dinheiro', label: 'Dinheiro', icone: '💵', cor: '' },
+                    { value: 'boleto', label: 'Boleto', icone: '📄', cor: '' },
+                    { value: 'transferencia', label: 'TED/DOC', icone: '🏦', cor: '' },
                   ].map(fp => (
                     <button
                       key={fp.value}
@@ -1092,11 +1086,13 @@ function VoiceButton({ empresaId, onSuccess }: { empresaId: string; onSuccess: (
                       className={clsx(
                         "p-1.5 rounded-lg text-xs font-medium border transition-all",
                         editFormaPagamento === fp.value 
-                          ? 'bg-primary-100 border-primary-500 text-primary-700' 
+                          ? fp.value === 'credito' ? 'bg-saida-light border-saida text-saida-dark'
+                            : fp.value === 'debito' ? 'bg-primary-100 border-primary-500 text-primary-700'
+                            : 'bg-primary-100 border-primary-500 text-primary-700'
                           : 'bg-neutral-50 border-neutral-200 hover:border-primary-300'
                       )}
                     >
-                      <span className="text-sm">{fp.icone}</span>
+                      <span className={`text-sm ${fp.cor}`}>{fp.icone}</span>
                       <span className="block text-[10px]">{fp.label}</span>
                     </button>
                   ))}
@@ -1443,13 +1439,13 @@ function QuickLancamentoModal({
 
   // Calcular taxa automática quando mudar forma de pagamento
   useEffect(() => {
-    if (formaPagamento && valor && tipo === 'entrada' && formaPagamento !== 'dinheiro') {
+    if (formaPagamento && valor && tipo === 'entrada' && !['dinheiro', ''].includes(formaPagamento)) {
       const valorNum = parseFloat(valor.replace(',', '.')) || 0;
       let taxa = 0;
       
       if (formaPagamento === 'pix' && taxasPadrao.taxa_pix) {
         taxa = taxasPadrao.taxa_pix;
-      } else if (formaPagamento === 'cartao' && taxasPadrao.taxa_cartao) {
+      } else if (['credito', 'debito'].includes(formaPagamento) && taxasPadrao.taxa_cartao) {
         taxa = (valorNum * taxasPadrao.taxa_cartao) / 100;
       } else if (formaPagamento === 'boleto' && taxasPadrao.taxa_boleto) {
         taxa = taxasPadrao.taxa_boleto;
@@ -1840,12 +1836,12 @@ function QuickLancamentoModal({
             <label className="block text-sm font-medium text-neutral-700 mb-1.5">Forma de Pagamento</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { value: '', label: '-', icone: '❌' },
-                { value: 'pix', label: 'PIX', icone: '📱' },
-                { value: 'cartao', label: 'Cartão', icone: '💳' },
-                { value: 'dinheiro', label: 'Dinheiro', icone: '💵' },
-                { value: 'boleto', label: 'Boleto', icone: '📄' },
-                { value: 'ticket', label: 'Ticket', icone: '🎟️' },
+                { value: '', label: '-', icone: '❌', cor: '' },
+                { value: 'pix', label: 'PIX', icone: '📱', cor: '' },
+                { value: 'credito', label: 'Crédito', icone: '💳', cor: 'text-saida' },
+                { value: 'debito', label: 'Débito', icone: '💳', cor: 'text-primary-600' },
+                { value: 'dinheiro', label: 'Dinheiro', icone: '💵', cor: '' },
+                { value: 'boleto', label: 'Boleto', icone: '📄', cor: '' },
               ].map(fp => (
                 <button
                   key={fp.value}
@@ -1853,11 +1849,13 @@ function QuickLancamentoModal({
                   onClick={() => setFormaPagamento(fp.value)}
                   className={`p-2 rounded-lg text-xs font-medium border transition-all ${
                     formaPagamento === fp.value 
-                      ? 'bg-primary-100 border-primary-500 text-primary-700' 
+                      ? fp.value === 'credito' ? 'bg-saida-light border-saida text-saida-dark'
+                        : fp.value === 'debito' ? 'bg-primary-100 border-primary-500 text-primary-700'
+                        : 'bg-primary-100 border-primary-500 text-primary-700'
                       : 'bg-neutral-50 border-neutral-200 hover:border-primary-300'
                   }`}
                 >
-                  <span className="text-base">{fp.icone}</span>
+                  <span className={`text-base ${fp.cor}`}>{fp.icone}</span>
                   <span className="block mt-0.5">{fp.label}</span>
                 </button>
               ))}
@@ -1865,7 +1863,7 @@ function QuickLancamentoModal({
           </div>
 
           {/* Taxa da Máquina (apenas para entradas com cartão/pix) */}
-          {tipo === 'entrada' && formaPagamento && formaPagamento !== 'dinheiro' && (
+          {tipo === 'entrada' && formaPagamento && !['dinheiro', ''].includes(formaPagamento) && (
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1.5">Taxa da Máquina</label>
               <Input
@@ -1878,16 +1876,16 @@ function QuickLancamentoModal({
                   ? `Taxa: R$ ${((parseFloat(valor.replace(',', '.') || '0') * parseFloat(taxaMaquina.replace('%', '').replace(',', '.') || '0')) / 100).toFixed(2)}`
                   : taxaMaquina && parseFloat(taxaMaquina.replace(',', '.')) > 0 
                     ? `💰 Líquido: R$ ${(parseFloat(valor.replace(',', '.') || '0') - parseFloat(taxaMaquina.replace(',', '.') || '0')).toFixed(2)}`
-                    : taxasPadrao[`taxa_${formaPagamento}`] 
-                      ? `Taxa padrão: ${['pix', 'boleto'].includes(formaPagamento) ? 'R$ ' + taxasPadrao[`taxa_${formaPagamento}`] : taxasPadrao[`taxa_${formaPagamento}`] + '%'}`
+                    : taxasPadrao[`taxa_${formaPagamento === 'credito' || formaPagamento === 'debito' ? 'cartao' : formaPagamento}`] 
+                      ? `Taxa padrão: ${['pix', 'boleto'].includes(formaPagamento) ? 'R$ ' + taxasPadrao[`taxa_${formaPagamento}`] : taxasPadrao[`taxa_${formaPagamento === 'credito' || formaPagamento === 'debito' ? 'cartao' : formaPagamento}`] + '%'}`
                       : 'Digite valor (ex: 2,50) ou percentual (ex: 3%)'
                 }
               </p>
             </div>
           )}
 
-          {/* Parcelas (para cartão, pix ou boleto) */}
-          {formaPagamento && ['cartao', 'pix', 'boleto'].includes(formaPagamento) && (
+          {/* Parcelas (para crédito, pix ou boleto) */}
+          {formaPagamento && ['credito', 'pix', 'boleto'].includes(formaPagamento) && (
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1.5">Parcelas</label>
               <select

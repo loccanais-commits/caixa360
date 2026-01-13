@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState } from '@/components/ui';
 import { formatarMoeda } from '@/lib/utils';
 import { Produto, TipoProduto } from '@/lib/types';
+import { useEmpresa, useProdutos, useFornecedores, invalidateProdutos } from '@/lib/hooks/useSWRHooks';
 import {
   Plus,
   ShoppingBag,
@@ -22,10 +23,14 @@ import {
 export default function ProdutosPage() {
   const supabase = createClient();
   
-  const [loading, setLoading] = useState(true);
-  const [produtos, setProdutos] = useState<Produto[]>([]);
+  // SWR Hooks
+  const { empresa, isLoading: loadingEmpresa } = useEmpresa();
+  const { produtos, isLoading: loadingProdutos, refresh: refreshProdutos } = useProdutos(empresa?.id || null);
+  const { fornecedores } = useFornecedores(empresa?.id || null);
+  
+  const loading = loadingEmpresa || loadingProdutos;
+  
   const [vendasPorProduto, setVendasPorProduto] = useState<Record<string, { qtd: number; total: number }>>({});
-  const [empresaId, setEmpresaId] = useState<string>('');
   
   // Filtros
   const [filtroBusca, setFiltroBusca] = useState('');
@@ -45,37 +50,18 @@ export default function ProdutosPage() {
   const [categoria, setCategoria] = useState('');
   const [descricao, setDescricao] = useState('');
   const [fornecedorId, setFornecedorId] = useState('');
-  const [fornecedores, setFornecedores] = useState<any[]>([]);
   const [salvando, setSalvando] = useState(false);
 
+  // Carregar vendas quando produtos mudam
   useEffect(() => {
-    carregarDados();
-  }, []);
+    if (empresa?.id && produtos.length > 0) {
+      carregarVendas();
+    }
+  }, [empresa?.id, produtos]);
 
-  async function carregarDados() {
-    setLoading(true);
+  async function carregarVendas() {
+    if (!empresa?.id) return;
     
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: empresa } = await supabase
-      .from('empresas')
-      .select('id')
-      .eq('usuario_id', user.id)
-      .single();
-    
-    if (!empresa) return;
-    setEmpresaId(empresa.id);
-
-    // Carregar produtos e fornecedores em paralelo
-    const [produtosRes, fornecedoresRes] = await Promise.all([
-      supabase.from('produtos').select('*').eq('empresa_id', empresa.id).order('nome'),
-      supabase.from('fornecedores').select('id, nome').eq('empresa_id', empresa.id).order('nome')
-    ]);
-    
-    setProdutos(produtosRes.data || []);
-    setFornecedores(fornecedoresRes.data || []);
-
     // Carregar vendas por produto (lançamentos vinculados)
     const { data: lancamentos } = await supabase
       .from('lancamentos')
@@ -95,12 +81,10 @@ export default function ProdutosPage() {
       }
     });
     setVendasPorProduto(vendas);
-
-    setLoading(false);
   }
 
   async function handleSalvar() {
-    if (!nome.trim() || !preco) {
+    if (!nome.trim() || !preco || !empresa?.id) {
       alert('Preencha nome e preço');
       return;
     }
@@ -108,7 +92,7 @@ export default function ProdutosPage() {
     setSalvando(true);
 
     const dados = {
-      empresa_id: empresaId,
+      empresa_id: empresa.id,
       nome: nome.trim(),
       tipo,
       preco: parseFloat(preco) || 0,
@@ -133,14 +117,16 @@ export default function ProdutosPage() {
     setSalvando(false);
     setShowModal(false);
     limparForm();
-    carregarDados();
+    if (empresa?.id) invalidateProdutos(empresa.id);
+    refreshProdutos();
   }
 
   async function handleExcluir(id: string) {
     if (!confirm('Deseja excluir este item? O histórico de vendas será mantido.')) return;
     
     await supabase.from('produtos').delete().eq('id', id);
-    carregarDados();
+    if (empresa?.id) invalidateProdutos(empresa.id);
+    refreshProdutos();
   }
 
   async function toggleAtivo(produto: Produto) {
@@ -148,7 +134,8 @@ export default function ProdutosPage() {
       .from('produtos')
       .update({ ativo: !produto.ativo })
       .eq('id', produto.id);
-    carregarDados();
+    if (empresa?.id) invalidateProdutos(empresa.id);
+    refreshProdutos();
   }
 
   function limparForm() {

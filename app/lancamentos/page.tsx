@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState } from '@/components/ui';
+import { ExpandableCardList, ExpandableItem } from '@/components/ui/ExpandableCard';
 import { formatarMoeda, formatarDataCurta } from '@/lib/utils';
 import { Lancamento, Fornecedor, Conta, CATEGORIAS_BASE, TipoLancamento, Categoria } from '@/lib/types';
+import { useEmpresa, useAllLancamentos, useFornecedores, useContas, invalidateLancamentos } from '@/lib/hooks/useSWRHooks';
 import {
   Plus,
   ArrowUpCircle,
@@ -25,11 +27,13 @@ import {
 export default function LancamentosPage() {
   const supabase = createClient();
   
-  const [loading, setLoading] = useState(true);
-  const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
-  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
-  const [aReceber, setAReceber] = useState<Conta[]>([]);
-  const [empresaId, setEmpresaId] = useState<string>('');
+  // SWR Hooks
+  const { empresa, isLoading: loadingEmpresa } = useEmpresa();
+  const { lancamentos, isLoading: loadingLancamentos, refresh: refreshLancamentos } = useAllLancamentos(empresa?.id || null);
+  const { fornecedores } = useFornecedores(empresa?.id || null);
+  const { contas: aReceber } = useContas(empresa?.id || null, 'entrada');
+  
+  const loading = loadingEmpresa || loadingLancamentos;
   
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
@@ -40,10 +44,6 @@ export default function LancamentosPage() {
   const [dataFim, setDataFim] = useState('');
   const [erroData, setErroData] = useState('');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
-  
-  // Resumo do período
-  const [entradasPeriodo, setEntradasPeriodo] = useState(0);
-  const [saidasPeriodo, setSaidasPeriodo] = useState(0);
   
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -59,14 +59,6 @@ export default function LancamentosPage() {
   const [observacao, setObservacao] = useState('');
   const [salvando, setSalvando] = useState(false);
 
-  useEffect(() => {
-    carregarDados();
-  }, []);
-
-  useEffect(() => {
-    calcularResumoPeriodo();
-  }, [lancamentos, dataInicio, dataFim]);
-
   // Validar datas do filtro
   useEffect(() => {
     if (dataInicio && dataFim && dataInicio > dataFim) {
@@ -76,87 +68,22 @@ export default function LancamentosPage() {
     }
   }, [dataInicio, dataFim]);
 
-  async function carregarDados() {
-    // Se já tem dados em cache (localStorage), mostrar imediatamente
-    const cachedData = localStorage.getItem('caixa360_lancamentos_cache');
-    if (cachedData) {
-      try {
-        const parsed = JSON.parse(cachedData);
-        if (parsed.lancamentos) setLancamentos(parsed.lancamentos);
-        if (parsed.fornecedores) setFornecedores(parsed.fornecedores);
-        if (parsed.empresaId) setEmpresaId(parsed.empresaId);
-        // Não mostra loading se tem cache
-        setLoading(false);
-      } catch (e) {}
-    } else {
-      setLoading(true);
-    }
-    
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: empresa } = await supabase
-      .from('empresas')
-      .select('id')
-      .eq('usuario_id', user.id)
-      .single();
-    
-    if (!empresa) return;
-    setEmpresaId(empresa.id);
-
-    // Carregar lançamentos
-    const { data: lancs } = await supabase
-      .from('lancamentos')
-      .select('*')
-      .eq('empresa_id', empresa.id)
-      .order('data', { ascending: false });
-    
-    setLancamentos(lancs || []);
-
-    // Carregar fornecedores
-    const { data: forns } = await supabase
-      .from('fornecedores')
-      .select('*')
-      .eq('empresa_id', empresa.id);
-    
-    setFornecedores(forns || []);
-
-    // Carregar A Receber (entradas pendentes)
-    const { data: contasReceber } = await supabase
-      .from('contas')
-      .select('*')
-      .eq('empresa_id', empresa.id)
-      .eq('tipo', 'entrada')
-      .in('status', ['pendente', 'atrasado'])
-      .order('data_vencimento', { ascending: true });
-    
-    setAReceber(contasReceber || []);
-    
-    // Salvar cache
-    localStorage.setItem('caixa360_lancamentos_cache', JSON.stringify({
-      lancamentos: lancs || [],
-      fornecedores: forns || [],
-      empresaId: empresa.id,
-      timestamp: Date.now()
-    }));
-    
-    setLoading(false);
-  }
-
-  function calcularResumoPeriodo() {
-    const lancamentosFiltrados = lancamentos.filter(l => {
+  // Cálculos com useMemo para performance
+  const { entradasPeriodo, saidasPeriodo } = useMemo(() => {
+    const lancsFiltrados = lancamentos.filter(l => {
       if (dataInicio && l.data < dataInicio) return false;
       if (dataFim && l.data > dataFim) return false;
       return true;
     });
-    const entradas = lancamentosFiltrados.filter(l => l.tipo === 'entrada').reduce((a, l) => a + Number(l.valor), 0);
-    const saidas = lancamentosFiltrados.filter(l => l.tipo === 'saida').reduce((a, l) => a + Number(l.valor), 0);
-    setEntradasPeriodo(entradas);
-    setSaidasPeriodo(saidas);
-  }
+    
+    return {
+      entradasPeriodo: lancsFiltrados.filter(l => l.tipo === 'entrada').reduce((a, l) => a + Number(l.valor), 0),
+      saidasPeriodo: lancsFiltrados.filter(l => l.tipo === 'saida').reduce((a, l) => a + Number(l.valor), 0)
+    };
+  }, [lancamentos, dataInicio, dataFim]);
 
   async function handleSalvar() {
-    if (!descricao || !valor || !empresaId) return;
+    if (!descricao || !valor || !empresa?.id) return;
     
     setSalvando(true);
     
@@ -179,7 +106,7 @@ export default function LancamentosPage() {
       await supabase
         .from('lancamentos')
         .insert({
-          empresa_id: empresaId,
+          empresa_id: empresa?.id,
           tipo,
           descricao,
           valor: valorNum,
@@ -193,14 +120,18 @@ export default function LancamentosPage() {
     setSalvando(false);
     setShowModal(false);
     limparForm();
-    carregarDados();
+    // Invalida cache e recarrega
+    if (empresa?.id) invalidateLancamentos(empresa.id);
+    refreshLancamentos();
   }
 
   async function handleExcluir(id: string) {
     if (!confirm('Deseja excluir este lançamento?')) return;
     
     await supabase.from('lancamentos').delete().eq('id', id);
-    carregarDados();
+    // Invalida cache e recarrega
+    if (empresa?.id) invalidateLancamentos(empresa.id);
+    refreshLancamentos();
   }
 
   function limparForm() {
@@ -437,59 +368,53 @@ export default function LancamentosPage() {
         {/* Lista */}
         <Card>
           {lancamentosFiltrados.length > 0 ? (
-            <div className="space-y-2">
-              {lancamentosFiltrados.map((lanc) => (
-                <div 
-                  key={lanc.id}
-                  className="p-3 bg-neutral-50 rounded-xl hover:bg-neutral-100 transition-colors"
-                >
-                  {/* Layout Mobile: Stack vertical */}
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-xl flex-shrink-0 ${lanc.tipo === 'entrada' ? 'bg-entrada-light' : 'bg-saida-light'}`}>
-                      {lanc.tipo === 'entrada' 
-                        ? <ArrowUpCircle className="w-4 h-4 text-entrada-dark" />
-                        : <ArrowDownCircle className="w-4 h-4 text-saida-dark" />
-                      }
+            <ExpandableCardList 
+              items={lancamentosFiltrados.map((lanc): ExpandableItem => ({
+                id: lanc.id,
+                title: lanc.descricao,
+                subtitle: formatarDataCurta(lanc.data),
+                value: `${lanc.tipo === 'entrada' ? '+' : '-'}${formatarMoeda(Number(lanc.valor))}`,
+                valueColor: lanc.tipo === 'entrada' ? 'text-entrada-dark' : 'text-saida-dark',
+                icon: lanc.tipo === 'entrada' 
+                  ? <ArrowUpCircle className="w-4 h-4 text-entrada-dark" />
+                  : <ArrowDownCircle className="w-4 h-4 text-saida-dark" />,
+                badge: CATEGORIAS_BASE[lanc.categoria as keyof typeof CATEGORIAS_BASE]?.label || lanc.categoria,
+                badgeColor: lanc.tipo === 'entrada' ? 'bg-entrada-light text-entrada-dark' : 'bg-saida-light text-saida-dark',
+                content: () => (
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-500">Categoria:</span>
+                      <span className="font-medium">{CATEGORIAS_BASE[lanc.categoria as keyof typeof CATEGORIAS_BASE]?.label || lanc.categoria}</span>
                     </div>
-                    
-                    {/* Conteúdo principal */}
-                    <div className="flex-1 min-w-0">
-                      {/* Descrição */}
-                      <p className="font-medium text-neutral-900 text-sm line-clamp-2">{lanc.descricao}</p>
-                      
-                      {/* Valor em linha separada */}
-                      <p className={`text-base font-bold mt-1 ${lanc.tipo === 'entrada' ? 'text-entrada-dark' : 'text-saida-dark'}`}>
-                        {lanc.tipo === 'entrada' ? '+' : '-'}{formatarMoeda(Number(lanc.valor))}
-                      </p>
-                      
-                      {/* Meta info e ações */}
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs text-neutral-500">{formatarDataCurta(lanc.data)}</span>
-                          <Badge variant={lanc.tipo === 'entrada' ? 'entrada' : 'saida'} className="text-xs">
-                            {CATEGORIAS_BASE[lanc.categoria as keyof typeof CATEGORIAS_BASE]?.label || lanc.categoria}
-                          </Badge>
-                        </div>
-                        <div className="flex gap-1">
-                          <button 
-                            onClick={() => abrirEdicao(lanc)}
-                            className="p-1.5 hover:bg-neutral-200 rounded-lg transition-colors"
-                          >
-                            <Edit className="w-4 h-4 text-neutral-500" />
-                          </button>
-                          <button 
-                            onClick={() => handleExcluir(lanc.id)}
-                            className="p-1.5 hover:bg-saida-light rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4 text-saida" />
-                          </button>
-                        </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-500">Data:</span>
+                      <span className="font-medium">{formatarDataCurta(lanc.data)}</span>
+                    </div>
+                    {lanc.fornecedor_id && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-neutral-500">Fornecedor:</span>
+                        <span className="font-medium">{fornecedores.find(f => f.id === lanc.fornecedor_id)?.nome || '-'}</span>
                       </div>
+                    )}
+                    {lanc.observacao && (
+                      <div className="text-sm">
+                        <span className="text-neutral-500">Obs:</span>
+                        <p className="font-medium mt-1">{lanc.observacao}</p>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-500">Tipo:</span>
+                      <Badge variant={lanc.tipo === 'entrada' ? 'entrada' : 'saida'}>{lanc.tipo}</Badge>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ),
+                ctaText: '✏️ Editar',
+                ctaAction: () => abrirEdicao(lanc),
+                cta2Text: '🗑️ Excluir',
+                cta2Action: () => handleExcluir(lanc.id)
+              }))}
+              emptyMessage="Nenhum lançamento encontrado"
+            />
           ) : (
             <EmptyState
               icon={<ArrowUpCircle className="w-8 h-8" />}

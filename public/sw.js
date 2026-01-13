@@ -31,6 +31,16 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Ignorar requisições que não são GET (HEAD, POST, etc)
+  if (event.request.method !== 'GET') {
+    return;
+  }
+  
+  // Ignorar requisições de API e Supabase
+  if (event.request.url.includes('/api/') || event.request.url.includes('supabase')) {
+    return;
+  }
+  
   event.respondWith(
     fetch(event.request)
       .then((response) => {

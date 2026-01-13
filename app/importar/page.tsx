@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardHeader, CardTitle, Button, Select, Badge, Modal, Loading } from '@/components/ui';
@@ -37,6 +38,7 @@ interface ColunaDetectada {
 
 export default function ImportarPage() {
   const supabase = createClient();
+  const router = useRouter();
   
   const [loading, setLoading] = useState(false);
   const [empresaId, setEmpresaId] = useState<string>('');
@@ -939,7 +941,7 @@ export default function ImportarPage() {
               <Button variant="ghost" onClick={() => { setStep(1); setLinhas([]); setArquivo(null); }}>
                 Importar outro arquivo
               </Button>
-              <Button variant="primary" onClick={() => window.location.href = '/lancamentos'}>
+              <Button variant="primary" onClick={() => router.push('/lancamentos')}>
                 Ver lançamentos
               </Button>
             </div>

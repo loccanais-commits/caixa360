@@ -19,21 +19,21 @@ export function Button({
   disabled,
   ...props 
 }: ButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center gap-2 font-medium rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2';
+  const baseStyles = 'inline-flex items-center justify-center gap-2 font-medium rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none';
   
   const variants = {
-    primary: 'bg-primary-500 text-white hover:bg-primary-600 focus:ring-primary-500 shadow-lg shadow-primary-500/25',
-    secondary: 'bg-secondary-500 text-white hover:bg-secondary-600 focus:ring-secondary-500',
-    outline: 'border-2 border-neutral-200 text-neutral-700 hover:bg-neutral-50 focus:ring-neutral-500',
-    ghost: 'text-neutral-600 hover:bg-neutral-100 focus:ring-neutral-500',
-    entrada: 'bg-entrada text-white hover:bg-entrada-dark focus:ring-entrada',
-    saida: 'bg-saida text-white hover:bg-saida-dark focus:ring-saida',
+    primary: 'bg-primary-500 text-white hover:bg-primary-600 hover:shadow-[0_7px_29px_rgba(6,182,212,0.5)] hover:tracking-wider active:transform active:translate-y-1',
+    secondary: 'bg-secondary-500 text-white hover:bg-secondary-600 hover:shadow-[0_7px_29px_rgba(16,185,129,0.5)] hover:tracking-wider active:transform active:translate-y-1',
+    outline: 'bg-white border-0 text-neutral-700 shadow-[0_0_8px_rgba(0,0,0,0.05)] hover:bg-primary-500 hover:text-white hover:shadow-[0_7px_29px_rgba(6,182,212,0.5)] hover:tracking-wider active:transform active:translate-y-1',
+    ghost: 'text-neutral-600 hover:bg-neutral-100 hover:tracking-wider',
+    entrada: 'bg-entrada text-white hover:bg-entrada-dark hover:shadow-[0_7px_29px_rgba(16,185,129,0.5)] hover:tracking-wider active:transform active:translate-y-1',
+    saida: 'bg-white text-saida shadow-[0_0_8px_rgba(0,0,0,0.05)] hover:bg-saida hover:text-white hover:shadow-[0_7px_29px_rgba(239,68,68,0.5)] hover:tracking-wider active:transform active:translate-y-1',
   };
 
   const sizes = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2.5 text-sm',
-    lg: 'px-6 py-3 text-base',
+    sm: 'px-4 py-2 text-sm',
+    md: 'px-6 py-2.5 text-sm',
+    lg: 'px-8 py-3 text-base',
   };
 
   return (
@@ -129,15 +129,19 @@ interface CardProps {
   children: ReactNode;
   className?: string;
   onClick?: () => void;
+  variant?: 'default' | 'neu';
 }
 
-export function Card({ children, className, onClick }: CardProps) {
+export function Card({ children, className, onClick, variant = 'default' }: CardProps) {
   return (
     <div
       onClick={onClick}
       className={clsx(
-        'bg-white rounded-2xl p-6 shadow-sm border border-neutral-100',
-        onClick && 'cursor-pointer hover:shadow-md transition-shadow',
+        'rounded-3xl p-6 transition-all duration-300',
+        variant === 'neu' 
+          ? 'bg-neutral-100 shadow-[8px_8px_16px_#d1d1d1,-8px_-8px_16px_#ffffff] hover:shadow-[12px_12px_20px_#c8c8c8,-12px_-12px_20px_#ffffff]'
+          : 'bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)]',
+        onClick && 'cursor-pointer hover:-translate-y-1',
         className
       )}
     >
@@ -165,14 +169,26 @@ export function CardTitle({ children, className }: { children: ReactNode; classN
 // ==================== STAT CARD ====================
 
 interface StatCardProps {
-  label: string;
+  label?: string;
+  title?: string; // alias para label
   value: string;
   icon?: ReactNode;
   variant?: 'default' | 'entrada' | 'saida' | 'alerta';
-  trend?: { value: number; label: string };
+  color?: 'primary' | 'success' | 'danger' | 'warning'; // alias para variant
+  trend?: 'up' | 'down' | { value: number; label: string };
 }
 
-export function StatCard({ label, value, icon, variant = 'default', trend }: StatCardProps) {
+export function StatCard({ label, title, value, icon, variant = 'default', color, trend }: StatCardProps) {
+  // Mapear color para variant
+  const variantMap: Record<string, 'default' | 'entrada' | 'saida' | 'alerta'> = {
+    primary: 'default',
+    success: 'entrada',
+    danger: 'saida',
+    warning: 'alerta'
+  };
+  const actualVariant = color ? variantMap[color] || variant : variant;
+  const displayLabel = label || title || '';
+
   const variants = {
     default: 'bg-white',
     entrada: 'bg-gradient-to-br from-entrada-light to-emerald-50',
@@ -187,24 +203,41 @@ export function StatCard({ label, value, icon, variant = 'default', trend }: Sta
     alerta: 'bg-alerta/10 text-alerta-dark',
   };
 
+  // Renderizar trend
+  const renderTrend = () => {
+    if (!trend) return null;
+    
+    // Se trend é string ('up' ou 'down'), não mostrar porcentagem
+    if (typeof trend === 'string') {
+      return null; // Não mostrar NaN%
+    }
+    
+    // Se trend é objeto com value e label
+    if (typeof trend === 'object' && 'value' in trend) {
+      return (
+        <p className={clsx(
+          'text-xs mt-1',
+          trend.value >= 0 ? 'text-entrada-dark' : 'text-saida-dark'
+        )}>
+          {trend.value >= 0 ? '▲' : '▼'} {Math.abs(trend.value)}% {trend.label}
+        </p>
+      );
+    }
+    
+    return null;
+  };
+
   return (
-    <Card className={clsx(variants[variant], 'overflow-hidden')}>
+    <Card className={clsx(variants[actualVariant], 'overflow-hidden')}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-xs text-neutral-500 truncate">{label}</p>
+          <p className="text-xs text-neutral-500 truncate">{displayLabel}</p>
           <p className="text-base sm:text-xl lg:text-2xl font-bold text-neutral-900 mt-0.5 sm:mt-1">{value}</p>
-          {trend && (
-            <p className={clsx(
-              'text-xs mt-1',
-              trend.value >= 0 ? 'text-entrada-dark' : 'text-saida-dark'
-            )}>
-              {trend.value >= 0 ? '▲' : '▼'} {Math.abs(trend.value)}% {trend.label}
-            </p>
-          )}
+          {renderTrend()}
         </div>
         {/* Ícone escondido no mobile para economizar espaço */}
         {icon && (
-          <div className={clsx('hidden sm:flex p-2 sm:p-3 rounded-xl flex-shrink-0', iconVariants[variant])}>
+          <div className={clsx('hidden sm:flex p-2 sm:p-3 rounded-xl flex-shrink-0', iconVariants[actualVariant])}>
             {icon}
           </div>
         )}
@@ -326,99 +359,19 @@ interface LoadingProps {
 
 export function Loading({ text, fullScreen = false }: LoadingProps) {
   const content = (
-    <div className="flex flex-col items-center justify-center py-8">
-      {/* Ampulheta Animada */}
-      <svg
-        aria-label="Carregando..."
-        role="img"
-        height="56px"
-        width="56px"
-        viewBox="0 0 56 56"
-        className="loader"
-      >
-        <clipPath id="sand-mound-top">
-          <path
-            d="M 14.613 13.087 C 15.814 12.059 19.3 8.039 20.3 6.539 C 21.5 4.789 21.5 2.039 21.5 2.039 L 3 2.039 C 3 2.039 3 4.789 4.2 6.539 C 5.2 8.039 8.686 12.059 9.887 13.087 C 11 14.039 12.25 14.039 12.25 14.039 C 12.25 14.039 13.5 14.039 14.613 13.087 Z"
-            className="loader__sand-mound-top"
-          />
-        </clipPath>
-        <clipPath id="sand-mound-bottom">
-          <path
-            d="M 14.613 20.452 C 15.814 21.48 19.3 25.5 20.3 27 C 21.5 28.75 21.5 31.5 21.5 31.5 L 3 31.5 C 3 31.5 3 28.75 4.2 27 C 5.2 25.5 8.686 21.48 9.887 20.452 C 11 19.5 12.25 19.5 12.25 19.5 C 12.25 19.5 13.5 19.5 14.613 20.452 Z"
-            className="loader__sand-mound-bottom"
-          />
-        </clipPath>
-        <g transform="translate(2,2)">
-          <g
-            transform="rotate(-90,26,26)"
-            strokeLinecap="round"
-            strokeDashoffset="153.94"
-            strokeDasharray="153.94 153.94"
-            stroke="hsl(0,0%,100%)"
-            fill="none"
-          >
-            <circle
-              transform="rotate(0,26,26)"
-              r="24.5"
-              cy="26"
-              cx="26"
-              strokeWidth="2.5"
-              className="loader__motion-thick"
-            />
-            <circle
-              transform="rotate(90,26,26)"
-              r="24.5"
-              cy="26"
-              cx="26"
-              strokeWidth="1.75"
-              className="loader__motion-medium"
-            />
-            <circle
-              transform="rotate(180,26,26)"
-              r="24.5"
-              cy="26"
-              cx="26"
-              strokeWidth="1"
-              className="loader__motion-thin"
-            />
-          </g>
-          <g transform="translate(13.75,9.25)" className="loader__model">
-            <path
-              d="M 1.5 2 L 23 2 C 23 2 22.5 8.5 19 12 C 16 15.5 13.5 13.5 13.5 16.75 C 13.5 20 16 18 19 21.5 C 22.5 25 23 31.5 23 31.5 L 1.5 31.5 C 1.5 31.5 2 25 5.5 21.5 C 8.5 18 11 20 11 16.75 C 11 13.5 8.5 15.5 5.5 12 C 2 8.5 1.5 2 1.5 2 Z"
-              fill="#e0f2fe"
-            />
-            <g strokeLinecap="round" stroke="#fbbf24">
-              <line y2="20.75" x2="12" y1="15.75" x1="12" strokeDasharray="0.25 33.75" strokeWidth="1" className="loader__sand-grain-left" />
-              <line y2="21.75" x2="12.5" y1="16.75" x1="12.5" strokeDasharray="0.25 33.75" strokeWidth="1" className="loader__sand-grain-right" />
-              <line y2="31.5" x2="12.25" y1="18" x1="12.25" strokeDasharray="0.5 107.5" strokeWidth="1" className="loader__sand-drop" />
-              <line y2="31.5" x2="12.25" y1="14.75" x1="12.25" strokeDasharray="54 54" strokeWidth="1.5" className="loader__sand-fill" />
-              <line y2="31.5" x2="12" y1="16" x1="12" strokeDasharray="1 107" strokeWidth="1" stroke="#f59e0b" className="loader__sand-line-left" />
-              <line y2="31.5" x2="12.5" y1="16" x1="12.5" strokeDasharray="12 96" strokeWidth="1" stroke="#f59e0b" className="loader__sand-line-right" />
-              <g strokeWidth="0" fill="#fbbf24">
-                <path d="M 12.25 15 L 15.392 13.486 C 21.737 11.168 22.5 2 22.5 2 L 2 2.013 C 2 2.013 2.753 11.046 9.009 13.438 L 12.25 15 Z" clipPath="url(#sand-mound-top)" />
-                <path d="M 12.25 18.5 L 15.392 20.014 C 21.737 22.332 22.5 31.5 22.5 31.5 L 2 31.487 C 2 31.487 2.753 22.454 9.009 20.062 Z" clipPath="url(#sand-mound-bottom)" />
-              </g>
-            </g>
-            <g strokeWidth="2" strokeLinecap="round" opacity="0.7" fill="none">
-              <path d="M 19.437 3.421 C 19.437 3.421 19.671 6.454 17.914 8.846 C 16.157 11.238 14.5 11.5 14.5 11.5" stroke="hsl(0,0%,100%)" className="loader__glare-top" />
-              <path transform="rotate(180,12.25,16.75)" d="M 19.437 3.421 C 19.437 3.421 19.671 6.454 17.914 8.846 C 16.157 11.238 14.5 11.5 14.5 11.5" stroke="hsla(0,0%,100%,0)" className="loader__glare-bottom" />
-            </g>
-            <rect height="2" width="24.5" fill="#10b981" />
-            <rect height="1" width="19.5" y="0.5" x="2.5" ry="0.5" rx="0.5" fill="#34d399" />
-            <rect height="2" width="24.5" y="31.5" fill="#10b981" />
-            <rect height="1" width="19.5" y="32" x="2.5" ry="0.5" rx="0.5" fill="#34d399" />
-          </g>
-        </g>
-      </svg>
-      {text && (
-        <p className="mt-4 text-sm text-neutral-500 animate-pulse">{text}</p>
-      )}
+    <div className="flex flex-col items-center justify-center py-12">
+      {/* Spinner simples */}
+      <div className="relative">
+        <div className="w-12 h-12 rounded-full border-4 border-neutral-200"></div>
+        <div className="w-12 h-12 rounded-full border-4 border-primary-500 border-t-transparent animate-spin absolute top-0 left-0"></div>
+      </div>
+      {text && <p className="text-sm text-neutral-500 mt-4">{text}</p>}
     </div>
   );
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
         {content}
       </div>
     );

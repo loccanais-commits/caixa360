@@ -32,17 +32,19 @@ body {
   bottom: 0;
   left: 0;
   z-index: 0;
-  background-image: linear-gradient(to right, #e2e8f0 1px, transparent 1px),
-    linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
-  background-size: 20px 30px;
+  --size: 24px;
+  background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px),
+    radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+  background-position: 0 0, calc(var(--size) / 2) calc(var(--size) / 2);
+  background-size: var(--size) var(--size);
   -webkit-mask-image: radial-gradient(
-    ellipse 70% 60% at 50% 0%,
-    #000 60%,
+    ellipse 80% 50% at 50% 0%,
+    #000 40%,
     transparent 100%
   );
   mask-image: radial-gradient(
-    ellipse 70% 60% at 50% 0%,
-    #000 60%,
+    ellipse 80% 50% at 50% 0%,
+    #000 40%,
     transparent 100%
   );
   pointer-events: none;
@@ -123,94 +125,89 @@ input[type="number"] {
 
 /* ==================== BOTÕES NEUMORPHIC ==================== */
 .btn-neu {
-  display: inline-block;
-  transition: all 0.2s ease-in;
-  position: relative;
-  overflow: hidden;
-  z-index: 1;
-  color: #090909;
-  padding: 0.6em 1.4em;
+  padding: 12px 28px;
+  border-radius: 50px;
   cursor: pointer;
+  border: 0;
+  background-color: white;
+  box-shadow: rgb(0 0 0 / 5%) 0 0 8px;
+  letter-spacing: 0.5px;
   font-size: 14px;
   font-weight: 500;
-  border-radius: 0.75em;
-  background: #f0f0f0;
-  border: 1px solid #e8e8e8;
-  box-shadow: 4px 4px 8px #d1d1d1, -4px -4px 8px #ffffff;
-}
-
-.btn-neu:active {
-  color: #666;
-  box-shadow: inset 3px 3px 8px #d1d1d1, inset -3px -3px 8px #ffffff;
-}
-
-.btn-neu:before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%) scaleY(1) scaleX(1.25);
-  top: 100%;
-  width: 140%;
-  height: 180%;
-  background-color: rgba(0, 0, 0, 0.05);
-  border-radius: 50%;
-  display: block;
-  transition: all 0.5s 0.1s cubic-bezier(0.55, 0, 0.1, 1);
-  z-index: -1;
-}
-
-.btn-neu:after {
-  content: "";
-  position: absolute;
-  left: 55%;
-  transform: translateX(-50%) scaleY(1) scaleX(1.45);
-  top: 180%;
-  width: 160%;
-  height: 190%;
-  background-color: #10b981;
-  border-radius: 50%;
-  display: block;
-  transition: all 0.5s 0.1s cubic-bezier(0.55, 0, 0.1, 1);
-  z-index: -1;
+  transition: all 0.4s ease;
 }
 
 .btn-neu:hover {
-  color: #ffffff;
-  border: 1px solid #10b981;
+  letter-spacing: 1.5px;
+  background-color: #10b981;
+  color: white;
+  box-shadow: #10b981 0px 7px 29px 0px;
 }
 
-.btn-neu:hover:before {
-  top: -35%;
-  background-color: #10b981;
-  transform: translateX(-50%) scaleY(1.3) scaleX(0.8);
-}
-
-.btn-neu:hover:after {
-  top: -45%;
-  background-color: #10b981;
-  transform: translateX(-50%) scaleY(1.3) scaleX(0.8);
+.btn-neu:active {
+  background-color: #059669;
+  color: white;
+  box-shadow: #10b981 0px 0px 0px 0px;
+  transform: translateY(4px);
+  transition: 100ms;
 }
 
 .btn-neu-primary {
-  background: linear-gradient(135deg, #10b981, #06b6d4);
+  background: #10b981;
   color: white;
-  border: none;
-  box-shadow: 4px 4px 12px rgba(16, 185, 129, 0.3), -2px -2px 8px #ffffff;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
 }
 
 .btn-neu-primary:hover {
-  box-shadow: 6px 6px 16px rgba(16, 185, 129, 0.4), -3px -3px 10px #ffffff;
-  transform: translateY(-1px);
+  background: #059669;
+  box-shadow: #10b981 0px 7px 29px 0px;
+  letter-spacing: 1.5px;
 }
 
 .btn-neu-primary:active {
-  box-shadow: inset 3px 3px 8px rgba(0,0,0,0.2);
-  transform: translateY(0);
+  box-shadow: #10b981 0px 0px 0px 0px;
+  transform: translateY(4px);
 }
 
-.btn-neu-primary:before,
-.btn-neu-primary:after {
-  display: none;
+.btn-neu-danger {
+  background: white;
+  color: #ef4444;
+}
+
+.btn-neu-danger:hover {
+  background: #ef4444;
+  color: white;
+  box-shadow: #ef4444 0px 7px 29px 0px;
+}
+
+.btn-neu-danger:active {
+  background: #dc2626;
+  box-shadow: #ef4444 0px 0px 0px 0px;
+  transform: translateY(4px);
+}
+
+/* ==================== CARDS NEUMORPHIC ==================== */
+.card-neu {
+  background: #f0f0f0;
+  border-radius: 24px;
+  box-shadow: 8px 8px 16px #d1d1d1, -8px -8px 16px #ffffff;
+  transition: all 0.3s ease;
+}
+
+.card-neu:hover {
+  box-shadow: 12px 12px 20px #c8c8c8, -12px -12px 20px #ffffff;
+}
+
+.card-neu-white {
+  background: white;
+  border-radius: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.card-neu-white:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
 }
 
 /* ==================== LOADER AMPULHETA ==================== */
@@ -410,15 +407,52 @@ input[type="number"] {
   56%, to { transform: scale(1, 1); }
 }
 
-/* ==================== BOTÃO DE VOZ ==================== */
+/* ==================== BOTÃO DE VOZ - CLEAN ==================== */
 .voice-btn {
-  @apply relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid #10b981;
+  background: linear-gradient(145deg, #ffffff, #f0f0f0);
+  box-sizing: border-box;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4), 4px 4px 10px rgba(0,0,0,0.15), -2px -2px 8px rgba(255,255,255,0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-.voice-btn.recording::before {
-  content: '';
-  @apply absolute inset-0 rounded-full bg-saida;
-  animation: pulse-ring 1.5s ease-out infinite;
+.voice-btn svg {
+  width: 24px;
+  height: 24px;
+  color: #10b981;
+  transition: all 0.3s ease;
+}
+
+.voice-btn:hover {
+  border-color: #059669;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.6), 5px 5px 15px rgba(0,0,0,0.2), -2px -2px 10px rgba(255,255,255,1);
+}
+
+.voice-btn:hover svg {
+  color: #059669;
+}
+
+.voice-btn.recording {
+  border: 2px solid #ef4444;
+  background: linear-gradient(145deg, #fef2f2, #fee2e2);
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.5), inset 1px 1px 2px rgba(255,255,255,0.5);
+  animation: voicePulse 1s ease-in-out infinite;
+}
+
+.voice-btn.recording svg {
+  color: #ef4444;
+}
+
+@keyframes voicePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 
 /* ==================== GRADIENTE DA LOGO ==================== */

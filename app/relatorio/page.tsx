@@ -335,9 +335,9 @@ export default function RelatorioPage() {
 
         {/* Filtro de período */}
         <Card>
-          <div className="flex flex-col sm:flex-row gap-4 items-end">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Período</label>
+          <div className="flex flex-col gap-4">
+            <div className="w-full">
+              <label className="block text-sm font-medium text-neutral-700 mb-2 text-center">Período</label>
               <Select
                 value={periodo}
                 onChange={(e) => handlePeriodoChange(e.target.value)}
@@ -351,14 +351,14 @@ export default function RelatorioPage() {
               />
             </div>
             {periodo === 'personalizado' && (
-              <>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">De</label>
                   <input
                     type="date"
                     value={dataInicio}
                     onChange={(e) => setDataInicio(e.target.value)}
-                    className="px-4 py-2.5 border border-neutral-200 rounded-xl"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-xl"
                   />
                 </div>
                 <div>
@@ -367,10 +367,10 @@ export default function RelatorioPage() {
                     type="date"
                     value={dataFim}
                     onChange={(e) => setDataFim(e.target.value)}
-                    className="px-4 py-2.5 border border-neutral-200 rounded-xl"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-xl"
                   />
                 </div>
-              </>
+              </div>
             )}
           </div>
         </Card>
@@ -478,31 +478,33 @@ export default function RelatorioPage() {
               </CardTitle>
             </CardHeader>
             {saidasPorCategoria.length > 0 ? (
-              <div className="flex items-center gap-4">
-                <ResponsiveContainer width="50%" height={200}>
-                  <RePieChart>
-                    <Pie
-                      data={saidasPorCategoria.slice(0, 6)}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={70}
-                      dataKey="value"
-                      paddingAngle={2}
-                    >
-                      {saidasPorCategoria.slice(0, 6).map((_, i) => (
-                        <Cell key={i} fill={CORES[i % CORES.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v: number) => formatarMoeda(v)} />
-                  </RePieChart>
-                </ResponsiveContainer>
-                <div className="flex-1 space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                <div className="h-[220px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RePieChart>
+                      <Pie
+                        data={saidasPorCategoria.slice(0, 6)}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        dataKey="value"
+                        paddingAngle={2}
+                      >
+                        {saidasPorCategoria.slice(0, 6).map((_, i) => (
+                          <Cell key={i} fill={CORES[i % CORES.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v: number) => formatarMoeda(v)} />
+                    </RePieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-3">
                   {saidasPorCategoria.slice(0, 6).map((cat, i) => (
                     <div key={cat.name} className="flex items-center gap-2 text-sm">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CORES[i % CORES.length] }} />
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: CORES[i % CORES.length] }} />
                       <span className="text-neutral-600 truncate flex-1">{cat.name}</span>
-                      <span className="font-medium">{formatarMoeda(cat.value)}</span>
+                      <span className="font-medium whitespace-nowrap">{formatarMoeda(cat.value)}</span>
                     </div>
                   ))}
                 </div>

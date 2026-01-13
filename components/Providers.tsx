@@ -1,12 +1,20 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { DataProvider } from '@/lib/contexts/DataContext';
+import { SWRConfig } from 'swr';
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <DataProvider>
+    <SWRConfig
+      value={{
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+        dedupingInterval: 10000,
+        errorRetryCount: 2,
+        keepPreviousData: true,
+      }}
+    >
       {children}
-    </DataProvider>
+    </SWRConfig>
   );
 }

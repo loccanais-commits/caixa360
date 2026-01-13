@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardHeader, CardTitle, StatCard, Button, Badge, EmptyState, Loading, Modal } from '@/components/ui';
 import { ExpandableCardList, ExpandableItem } from '@/components/ui/ExpandableCard';
-import { formatarMoeda, formatarDataCurta, formatarPercentual, calcularVariacao } from '@/lib/utils';
-import { Empresa, Lancamento, Conta, CATEGORIAS_BASE } from '@/lib/types';
+import { formatarMoeda, formatarDataCurta, formatarPercentual } from '@/lib/utils';
+import { Lancamento, Conta, CATEGORIAS_BASE } from '@/lib/types';
+import { useEmpresa, useDashboardData } from '@/lib/hooks/useSWRHooks';
 import {
   Wallet,
   TrendingUp,
@@ -18,12 +19,10 @@ import {
   ChevronRight,
   RefreshCw,
   Sparkles,
-  Plus,
-  X,
   Bell,
   Package,
-  Clock,
-  CheckCircle
+  Lightbulb,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -45,297 +44,229 @@ import {
 const CORES = ['#06b6d4', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#3b82f6'];
 
 export default function DashboardPage() {
-  const supabase = createClient();
+  const router = useRouter();
   
-  const [loading, setLoading] = useState(true);
-  const [empresa, setEmpresa] = useState<Empresa | null>(null);
-  
-  // Métricas
-  const [saldoAtual, setSaldoAtual] = useState(0);
-  const [totalEntradas, setTotalEntradas] = useState(0);
-  const [totalSaidas, setTotalSaidas] = useState(0);
-  const [resultado, setResultado] = useState(0);
-  const [prolaboreRetirado, setProlaboreRetirado] = useState(0);
-  const [saudeCaixa, setSaudeCaixa] = useState(50);
-  
-  // Listas
-  const [proximasContas, setProximasContas] = useState<Conta[]>([]);
-  const [aReceber, setAReceber] = useState<Conta[]>([]);
-  const [ultimosLancamentos, setUltimosLancamentos] = useState<Lancamento[]>([]);
-  const [contasAtrasadas, setContasAtrasadas] = useState<Conta[]>([]);
-  
-  // Dados gráficos
-  const [dadosEvolucao, setDadosEvolucao] = useState<any[]>([]);
-  const [dadosCategorias, setDadosCategorias] = useState<any[]>([]);
-  const [dadosComparativo, setDadosComparativo] = useState<any[]>([]);
-  const [topProdutos, setTopProdutos] = useState<any[]>([]);
+  // SWR Hooks - dados cacheados automaticamente!
+  const { empresa, isLoading: loadingEmpresa } = useEmpresa();
+  const { data: dashboardData, isLoading: loadingDashboard, refresh } = useDashboardData(empresa?.id || null);
   
   // Modal de alertas
   const [showAlertas, setShowAlertas] = useState(false);
+  const [alertasVistos, setAlertasVistos] = useState(false);
+  const [alertaDismissed, setAlertaDismissed] = useState(false);
+  
+  // Filtro de período para evolução
+  const [filtroEvolucao, setFiltroEvolucao] = useState<'semana' | 'mes' | 'ano'>('mes');
 
-  useEffect(() => {
-    carregarDados();
-  }, []);
-
-  async function carregarDados() {
-    // Tentar usar cache primeiro para mostrar dados instantaneamente
-    const cachedData = localStorage.getItem('caixa360_dashboard_cache');
-    if (cachedData) {
-      try {
-        const parsed = JSON.parse(cachedData);
-        // Verificar se cache não é muito antigo (5 minutos)
-        if (parsed.timestamp && Date.now() - parsed.timestamp < 300000) {
-          setEmpresa(parsed.empresa);
-          setTotalEntradas(parsed.totalEntradas || 0);
-          setTotalSaidas(parsed.totalSaidas || 0);
-          setResultado(parsed.resultado || 0);
-          setSaldoAtual(parsed.saldoAtual || 0);
-          setUltimosLancamentos(parsed.ultimosLancamentos || []);
-          setProlaboreRetirado(parsed.prolaboreRetirado || 0);
-          setContasAtrasadas(parsed.contasAtrasadas || []);
-          setProximasContas(parsed.proximasContas || []);
-          // Não mostrar loading se tem cache válido
-          setLoading(false);
-        }
-      } catch (e) {}
+  // Métricas calculadas
+  const metricas = useMemo(() => {
+    if (!dashboardData || !empresa) {
+      return {
+        saldoAtual: 0,
+        totalEntradas: 0,
+        totalSaidas: 0,
+        resultado: 0,
+        prolaboreRetirado: 0,
+        saudeCaixa: 50
+      };
     }
+
+    const { metricas: m, todosLancamentos, contasAtrasadas } = dashboardData;
     
-    // Se não tem cache, mostrar loading
-    if (!cachedData) {
-      setLoading(true);
-    }
-    
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    // Carregar empresa
-    const { data: emp } = await supabase
-      .from('empresas')
-      .select('*')
-      .eq('usuario_id', user.id)
-      .single();
-    
-    if (!emp) return;
-    setEmpresa(emp);
-
-    // Carregar lançamentos do mês atual
-    const inicioMes = new Date();
-    inicioMes.setDate(1);
-    const inicioMesStr = inicioMes.toISOString().split('T')[0];
-
-    const { data: lancamentos } = await supabase
-      .from('lancamentos')
-      .select('*')
-      .eq('empresa_id', emp.id)
-      .order('data', { ascending: false });
-
-    const lancamentosMes = (lancamentos || []).filter(l => l.data >= inicioMesStr);
-    
-    // Calcular totais
-    const entradas = lancamentosMes.filter(l => l.tipo === 'entrada').reduce((a, l) => a + Number(l.valor), 0);
-    const saidas = lancamentosMes.filter(l => l.tipo === 'saida').reduce((a, l) => a + Number(l.valor), 0);
-    
-    // Calcular saldo (saldo inicial + todas as entradas - todas as saídas)
-    const todasEntradas = (lancamentos || []).filter(l => l.tipo === 'entrada').reduce((a, l) => a + Number(l.valor), 0);
-    const todasSaidas = (lancamentos || []).filter(l => l.tipo === 'saida').reduce((a, l) => a + Number(l.valor), 0);
-    const saldo = Number(emp.saldo_inicial) + todasEntradas - todasSaidas;
-
-    setTotalEntradas(entradas);
-    setTotalSaidas(saidas);
-    setResultado(entradas - saidas);
-    setSaldoAtual(saldo);
-    setUltimosLancamentos((lancamentos || []).slice(0, 5));
-
-    // Carregar pró-labore do mês
-    const { data: retiradas } = await supabase
-      .from('retiradas_prolabore')
-      .select('valor')
-      .eq('empresa_id', emp.id)
-      .gte('data', inicioMesStr);
-    
-    const totalRetirado = (retiradas || []).reduce((a, r) => a + Number(r.valor), 0);
-    setProlaboreRetirado(totalRetirado);
-
-    // Carregar contas
-    const hoje = new Date().toISOString().split('T')[0];
-    const { data: contas } = await supabase
-      .from('contas')
-      .select('*')
-      .eq('empresa_id', emp.id)
-      .in('status', ['pendente', 'atrasado'])
-      .order('data_vencimento', { ascending: true });
-
-    const atrasadas = (contas || []).filter(c => c.data_vencimento < hoje);
-    const proximasPagar = (contas || []).filter(c => c.data_vencimento >= hoje && c.tipo === 'saida').slice(0, 5);
-    const proximasReceber = (contas || []).filter(c => c.data_vencimento >= hoje && c.tipo === 'entrada').slice(0, 5);
-    
-    setContasAtrasadas(atrasadas);
-    setProximasContas(proximasPagar);
-    setAReceber(proximasReceber);
+    // Calcular saldo atual
+    const todasEntradas = todosLancamentos
+      .filter((l: Lancamento) => l.tipo === 'entrada')
+      .reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
+    const todasSaidas = todosLancamentos
+      .filter((l: Lancamento) => l.tipo === 'saida')
+      .reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
+    const saldoAtual = Number(empresa.saldo_inicial || 0) + todasEntradas - todasSaidas;
 
     // Calcular saúde do caixa
     let pontos = 50;
-    if (saldo > 0) pontos += 15;
-    if (saldo > 5000) pontos += 10;
-    if (entradas - saidas > 0) pontos += 15;
-    if (entradas - saidas < 0) pontos -= 20;
-    pontos -= atrasadas.length * 10;
-    setSaudeCaixa(Math.max(0, Math.min(100, pontos)));
+    if (saldoAtual > 0) pontos += 15;
+    if (saldoAtual > 5000) pontos += 10;
+    if (m.resultado > 0) pontos += 15;
+    if (m.resultado < 0) pontos -= 20;
+    pontos -= (contasAtrasadas?.length || 0) * 10;
 
-    // Top 5 Produtos/Serviços mais vendidos
-    const lancamentosComProduto = (lancamentos || []).filter(l => l.produto_id && l.tipo === 'entrada');
-    const vendasPorProduto: Record<string, { nome: string; qtd: number; total: number }> = {};
+    return {
+      saldoAtual,
+      totalEntradas: m.entradas,
+      totalSaidas: m.saidas,
+      resultado: m.resultado,
+      prolaboreRetirado: m.prolabore,
+      saudeCaixa: Math.max(0, Math.min(100, pontos))
+    };
+  }, [dashboardData, empresa]);
+
+  // Dados dos gráficos
+  const dadosGraficos = useMemo(() => {
+    if (!dashboardData || !empresa) {
+      return { evolucao: [], categorias: [], comparativo: [], topProdutos: [] };
+    }
+
+    const { todosLancamentos, lancamentosMes } = dashboardData;
     
-    const produtoIds = [...new Set(lancamentosComProduto.map(l => l.produto_id))];
-    if (produtoIds.length > 0) {
-      const { data: produtos } = await supabase
-        .from('produtos')
-        .select('id, nome, tipo')
-        .in('id', produtoIds);
-      
-      const produtosMap: Record<string, any> = {};
-      (produtos || []).forEach(p => { produtosMap[p.id] = p; });
-      
-      lancamentosComProduto.forEach(l => {
-        if (l.produto_id && produtosMap[l.produto_id]) {
-          if (!vendasPorProduto[l.produto_id]) {
-            vendasPorProduto[l.produto_id] = {
-              nome: produtosMap[l.produto_id].nome,
-              qtd: 0,
-              total: 0
-            };
-          }
-          vendasPorProduto[l.produto_id].qtd += 1;
-          vendasPorProduto[l.produto_id].total += Number(l.valor);
-        }
-      });
-      
-      const topProd = Object.values(vendasPorProduto)
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 5);
-      
-      setTopProdutos(topProd);
-    }
-
-    // Preparar dados para gráficos
-    prepararDadosGraficos(lancamentos || [], emp.saldo_inicial);
-
-    // Mostrar modal de alertas se tiver contas atrasadas
-    if (atrasadas.length > 0) {
-      setShowAlertas(true);
-    }
-
-    // Salvar cache para navegação mais rápida
-    localStorage.setItem('caixa360_dashboard_cache', JSON.stringify({
-      empresa: emp,
-      totalEntradas: entradas,
-      totalSaidas: saidas,
-      resultado: entradas - saidas,
-      saldoAtual: saldo,
-      ultimosLancamentos: (lancamentos || []).slice(0, 5),
-      prolaboreRetirado: totalRetirado,
-      contasAtrasadas: atrasadas,
-      proximasContas: proximasPagar,
-      timestamp: Date.now()
-    }));
-
-    setLoading(false);
-  }
-
-  function prepararDadosGraficos(lancamentos: Lancamento[], saldoInicial: number) {
-    // Evolução do saldo (últimos 30 dias)
+    // Determinar período baseado no filtro
     const hoje = new Date();
+    let diasParaVoltar = 30;
+    let formatoData = { day: '2-digit', month: '2-digit' } as const;
+    
+    if (filtroEvolucao === 'semana') {
+      diasParaVoltar = 7;
+      formatoData = { day: '2-digit', month: '2-digit' } as const;
+    } else if (filtroEvolucao === 'ano') {
+      diasParaVoltar = 365;
+      formatoData = { month: 'short' } as const;
+    }
+    
     const evolucao: any[] = [];
-    let saldoAcumulado = saldoInicial;
-
-    // Ordenar por data
-    const ordenados = [...lancamentos].sort((a, b) => 
+    let saldoAcumulado = Number(empresa.saldo_inicial || 0);
+    
+    // Processar todos os lançamentos ordenados por data
+    const lancamentosOrdenados = [...todosLancamentos].sort((a: Lancamento, b: Lancamento) => 
       new Date(a.data).getTime() - new Date(b.data).getTime()
     );
-
-    // Calcular saldo até 30 dias atrás
-    const ha30Dias = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
-    for (const l of ordenados) {
-      if (new Date(l.data) < ha30Dias) {
-        saldoAcumulado += l.tipo === 'entrada' ? Number(l.valor) : -Number(l.valor);
+    
+    // Para ano, agrupar por mês
+    if (filtroEvolucao === 'ano') {
+      for (let i = 11; i >= 0; i--) {
+        const mesData = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+        const mesNome = mesData.toLocaleDateString('pt-BR', { month: 'short' });
+        const inicioMes = mesData.toISOString().split('T')[0];
+        const fimMes = new Date(mesData.getFullYear(), mesData.getMonth() + 1, 0).toISOString().split('T')[0];
+        
+        const lancsMes = lancamentosOrdenados.filter((l: Lancamento) => l.data >= inicioMes && l.data <= fimMes);
+        const entradasMes = lancsMes.filter((l: Lancamento) => l.tipo === 'entrada').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
+        const saidasMes = lancsMes.filter((l: Lancamento) => l.tipo === 'saida').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
+        
+        // Calcular saldo acumulado até o fim do mês
+        const lancAnteriores = lancamentosOrdenados.filter((l: Lancamento) => l.data <= fimMes);
+        const saldo = Number(empresa.saldo_inicial || 0) + 
+          lancAnteriores.filter((l: Lancamento) => l.tipo === 'entrada').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0) -
+          lancAnteriores.filter((l: Lancamento) => l.tipo === 'saida').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
+        
+        evolucao.push({ data: mesNome, saldo, entradas: entradasMes, saidas: saidasMes });
+      }
+    } else {
+      for (let i = diasParaVoltar - 1; i >= 0; i--) {
+        const data = new Date(hoje);
+        data.setDate(data.getDate() - i);
+        const dataStr = data.toISOString().split('T')[0];
+        
+        const lancsDia = lancamentosOrdenados.filter((l: Lancamento) => l.data === dataStr);
+        const entradasDia = lancsDia.filter((l: Lancamento) => l.tipo === 'entrada').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
+        const saidasDia = lancsDia.filter((l: Lancamento) => l.tipo === 'saida').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
+        
+        if (i === diasParaVoltar - 1) {
+          const lancAnteriores = lancamentosOrdenados.filter((l: Lancamento) => l.data < dataStr);
+          saldoAcumulado = Number(empresa.saldo_inicial || 0) + 
+            lancAnteriores.filter((l: Lancamento) => l.tipo === 'entrada').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0) -
+            lancAnteriores.filter((l: Lancamento) => l.tipo === 'saida').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
+        }
+        
+        saldoAcumulado += entradasDia - saidasDia;
+        
+        evolucao.push({
+          data: data.toLocaleDateString('pt-BR', formatoData),
+          saldo: saldoAcumulado,
+          entradas: entradasDia,
+          saidas: saidasDia
+        });
       }
     }
 
-    for (let i = 30; i >= 0; i--) {
-      const data = new Date(hoje.getTime() - i * 24 * 60 * 60 * 1000);
-      const dataStr = data.toISOString().split('T')[0];
-
-      const lancamentosDia = ordenados.filter(l => l.data === dataStr);
-      for (const l of lancamentosDia) {
-        saldoAcumulado += l.tipo === 'entrada' ? Number(l.valor) : -Number(l.valor);
-      }
-
-      evolucao.push({
-        data: data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
-        saldo: saldoAcumulado,
-      });
-    }
-    setDadosEvolucao(evolucao);
-
-    // Gastos por categoria (mês atual)
-    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const lancamentosMes = lancamentos.filter(l => 
-      new Date(l.data) >= inicioMes && l.tipo === 'saida'
-    );
-
+    // Categorias do mês
     const porCategoria: Record<string, number> = {};
-    for (const l of lancamentosMes) {
-      const cat = CATEGORIAS_BASE[l.categoria as keyof typeof CATEGORIAS_BASE]?.label || l.categoria;
+    lancamentosMes.filter((l: Lancamento) => l.tipo === 'saida').forEach((l: Lancamento) => {
+      const cat = l.categoria || 'outros';
       porCategoria[cat] = (porCategoria[cat] || 0) + Number(l.valor);
-    }
-
+    });
+    
     const categorias = Object.entries(porCategoria)
-      .map(([nome, valor]) => ({ nome, valor }))
-      .sort((a, b) => b.valor - a.valor)
+      .map(([cat, valor]) => ({
+        name: CATEGORIAS_BASE[cat as keyof typeof CATEGORIAS_BASE]?.label || cat,
+        value: valor
+      }))
+      .sort((a, b) => b.value - a.value)
       .slice(0, 6);
-    setDadosCategorias(categorias);
 
-    // Comparativo últimas 4 semanas (com datas)
+    // Comparativo mensal (últimos 6 meses)
     const comparativo: any[] = [];
-    for (let i = 3; i >= 0; i--) {
-      const inicioSemana = new Date(hoje.getTime() - (i + 1) * 7 * 24 * 60 * 60 * 1000);
-      const fimSemana = new Date(hoje.getTime() - i * 7 * 24 * 60 * 60 * 1000);
-
-      const lancamentosSemana = lancamentos.filter(l => {
-        const d = new Date(l.data);
-        return d >= inicioSemana && d < fimSemana;
-      });
-
-      // Formatar período com datas
-      const diaInicio = inicioSemana.getDate().toString().padStart(2, '0');
-      const mesInicio = (inicioSemana.getMonth() + 1).toString().padStart(2, '0');
-      const diaFim = fimSemana.getDate().toString().padStart(2, '0');
-      const mesFim = (fimSemana.getMonth() + 1).toString().padStart(2, '0');
-
-      comparativo.push({
-        periodo: `${diaInicio}/${mesInicio}-${diaFim}/${mesFim}`,
-        entradas: lancamentosSemana.filter(l => l.tipo === 'entrada').reduce((a, l) => a + Number(l.valor), 0),
-        saidas: lancamentosSemana.filter(l => l.tipo === 'saida').reduce((a, l) => a + Number(l.valor), 0),
-      });
+    for (let i = 5; i >= 0; i--) {
+      const mesData = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      const mesNome = mesData.toLocaleDateString('pt-BR', { month: 'short' });
+      const inicioMes = mesData.toISOString().split('T')[0];
+      const fimMes = new Date(mesData.getFullYear(), mesData.getMonth() + 1, 0).toISOString().split('T')[0];
+      
+      const lancsMes = todosLancamentos.filter((l: Lancamento) => l.data >= inicioMes && l.data <= fimMes);
+      const entradas = lancsMes.filter((l: Lancamento) => l.tipo === 'entrada').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
+      const saidas = lancsMes.filter((l: Lancamento) => l.tipo === 'saida').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
+      
+      comparativo.push({ mes: mesNome, entradas, saidas });
     }
-    setDadosComparativo(comparativo);
+
+    // Top Produtos Vendidos (lançamentos de entrada com produto_id ou categoria venda_produto)
+    const vendasPorProduto: Record<string, { total: number; qtd: number }> = {};
+    lancamentosMes
+      .filter((l: Lancamento) => l.tipo === 'entrada' && (l.produto_id || l.categoria === 'venda_produto' || l.categoria === 'vendas'))
+      .forEach((l: Lancamento) => {
+        const nome = l.descricao || 'Produto sem nome';
+        if (!vendasPorProduto[nome]) {
+          vendasPorProduto[nome] = { total: 0, qtd: 0 };
+        }
+        vendasPorProduto[nome].total += Number(l.valor);
+        vendasPorProduto[nome].qtd += 1;
+      });
+    
+    const topProdutos = Object.entries(vendasPorProduto)
+      .map(([nome, dados]) => ({ nome, total: dados.total, qtd: dados.qtd }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+
+    return { evolucao, categorias, comparativo, topProdutos };
+  }, [dashboardData, empresa, filtroEvolucao]);
+
+  // Mostrar alertas quando tiver contas atrasadas
+  const contasAtrasadas = dashboardData?.contasAtrasadas || [];
+  if (contasAtrasadas.length > 0 && !alertasVistos && !loadingDashboard) {
+    setTimeout(() => {
+      setShowAlertas(true);
+      setAlertasVistos(true);
+    }, 500);
   }
 
-  // Gauge de saúde
-  const GaugeSaude = ({ valor }: { valor: number }) => {
+  // Loading
+  const isLoading = loadingEmpresa || (loadingDashboard && !dashboardData);
+
+  // Componente de Saúde do Caixa
+  const SaudeCaixa = ({ valor, size = 'md' }: { valor: number; size?: 'sm' | 'md' | 'lg' }) => {
     let cor = '#ef4444';
     let status = 'Crítico';
     if (valor >= 70) { cor = '#10b981'; status = 'Saudável'; }
     else if (valor >= 40) { cor = '#f59e0b'; status = 'Atenção'; }
-
+    
+    const sizeClasses = {
+      sm: 'w-14 h-8',
+      md: 'w-20 h-12',
+      lg: 'w-28 h-16'
+    };
+    
+    const fontSizes = {
+      sm: 'text-sm',
+      md: 'text-lg',
+      lg: 'text-2xl'
+    };
+    
     return (
       <div className="flex flex-col items-center">
-        <div className="relative w-24 h-12">
-          <svg viewBox="0 0 100 50" className="w-full">
+        <div className={`relative ${sizeClasses[size]}`}>
+          <svg viewBox="0 0 100 60" className="w-full h-full">
             <path
               d="M 5 50 A 45 45 0 0 1 95 50"
               fill="none"
-              stroke="#e5e5e5"
+              stroke="#e5e7eb"
               strokeWidth="8"
               strokeLinecap="round"
             />
@@ -349,15 +280,15 @@ export default function DashboardPage() {
             />
           </svg>
           <div className="absolute inset-0 flex items-end justify-center pb-0">
-            <span className="text-lg font-bold">{valor}%</span>
+            <span className={`font-bold ${fontSizes[size]}`}>{valor}%</span>
           </div>
         </div>
-        <span className="text-xs font-medium mt-1" style={{ color: cor }}>{status}</span>
+        {size !== 'sm' && <span className={`font-medium mt-1 ${size === 'lg' ? 'text-sm' : 'text-xs'}`} style={{ color: cor }}>{status}</span>}
       </div>
     );
   };
 
-  if (loading && !empresa) {
+  if (isLoading) {
     return (
       <AppLayout>
         <Loading />
@@ -365,11 +296,9 @@ export default function DashboardPage() {
     );
   }
 
-  const prolaboreDisponivel = (empresa?.prolabore_definido || 0) - prolaboreRetirado;
-
   return (
     <AppLayout>
-      <div className="space-y-6 animate-fade-in">
+      <div className="space-y-4 sm:space-y-6 animate-fade-in overflow-hidden">
         {/* Modal de Alertas */}
         <Modal 
           isOpen={showAlertas} 
@@ -379,239 +308,326 @@ export default function DashboardPage() {
           <div className="space-y-4">
             {contasAtrasadas.length > 0 && (
               <div className="p-4 bg-saida-light rounded-xl">
-                <p className="font-medium text-saida-dark mb-2">
-                  🔴 {contasAtrasadas.length} conta(s) atrasada(s)
+                <p className="font-medium text-saida-dark flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  {contasAtrasadas.length} conta(s) atrasada(s)!
                 </p>
-                <ul className="text-sm text-neutral-700 space-y-1">
-                  {contasAtrasadas.slice(0, 3).map(c => (
-                    <li key={c.id}>
-                      • {c.descricao} - {formatarMoeda(Number(c.valor))} (venceu {formatarDataCurta(c.data_vencimento)})
+                <ul className="mt-2 space-y-1">
+                  {contasAtrasadas.slice(0, 3).map((c: Conta) => (
+                    <li key={c.id} className="text-sm text-neutral-600">
+                      • {c.descricao} - {formatarMoeda(Number(c.valor))}
                     </li>
                   ))}
                 </ul>
               </div>
             )}
-
-            {proximasContas.length > 0 && (
-              <div className="p-4 bg-alerta-light rounded-xl">
-                <p className="font-medium text-alerta-dark mb-2">
-                  🟡 {proximasContas.length} conta(s) a vencer
-                </p>
-                <ul className="text-sm text-neutral-700 space-y-1">
-                  {proximasContas.slice(0, 3).map(c => (
-                    <li key={c.id}>
-                      • {c.descricao} - {formatarMoeda(Number(c.valor))} ({formatarDataCurta(c.data_vencimento)})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <Link href="/contas" className="flex-1">
-                <Button variant="primary" className="w-full">
-                  Ver todas as contas
-                </Button>
-              </Link>
-              <Button variant="ghost" onClick={() => setShowAlertas(false)}>
-                Lembrar depois
-              </Button>
-            </div>
+            <Button variant="primary" className="w-full" onClick={() => { setShowAlertas(false); router.push('/contas'); }}>
+              Ver todas as contas
+            </Button>
           </div>
         </Modal>
 
-        {/* Cards de métricas - 1 coluna no mobile, 2 no tablet, 5 no desktop */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-          <StatCard
-            label="Caixa da Empresa"
-            value={formatarMoeda(saldoAtual)}
-            variant={saldoAtual >= 0 ? 'entrada' : 'saida'}
-          />
-          <StatCard
-            label="Entradas (mês)"
-            value={formatarMoeda(totalEntradas)}
-            variant="entrada"
-          />
-          <StatCard
-            label="Saídas (mês)"
-            value={formatarMoeda(totalSaidas)}
-            variant="saida"
-          />
-          <StatCard
-            label="Resultado (mês)"
-            value={formatarMoeda(resultado)}
-            variant={resultado >= 0 ? 'entrada' : 'saida'}
-          />
-          <Card className="flex flex-col items-center justify-center py-4">
-            <p className="text-xs text-neutral-500 mb-2">Saúde do Caixa</p>
-            <GaugeSaude valor={saudeCaixa} />
-          </Card>
+        {/* Header com Refresh */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-neutral-900">Dashboard</h1>
+            <p className="text-neutral-500 text-sm">Visão geral do seu negócio</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {contasAtrasadas.length > 0 && (
+              <button 
+                onClick={() => setShowAlertas(true)}
+                className="p-2 bg-saida-light rounded-full relative"
+              >
+                <Bell className="w-5 h-5 text-saida-dark" />
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-saida text-white text-xs rounded-full flex items-center justify-center">
+                  {contasAtrasadas.length}
+                </span>
+              </button>
+            )}
+            <button 
+              onClick={() => refresh()}
+              className="p-2 hover:bg-neutral-100 rounded-full transition-colors"
+              title="Atualizar dados"
+            >
+              <RefreshCw className="w-5 h-5 text-neutral-500" />
+            </button>
+          </div>
         </div>
 
-        {/* Card Pró-labore */}
-        <div className="grid lg:grid-cols-3 gap-4">
-          <Card className="lg:col-span-1">
+        {/* Cards de Métricas - Linha única responsiva */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          <StatCard
+            title="Saldo Atual"
+            value={formatarMoeda(metricas.saldoAtual)}
+            icon={<Wallet className="w-5 h-5" />}
+            color={metricas.saldoAtual >= 0 ? 'primary' : 'danger'}
+          />
+          <StatCard
+            title="Entradas"
+            value={formatarMoeda(metricas.totalEntradas)}
+            icon={<ArrowUpCircle className="w-5 h-5" />}
+            color="success"
+          />
+          <StatCard
+            title="Saídas"
+            value={formatarMoeda(metricas.totalSaidas)}
+            icon={<ArrowDownCircle className="w-5 h-5" />}
+            color="danger"
+          />
+          <StatCard
+            title="Resultado"
+            value={formatarMoeda(metricas.resultado)}
+            icon={metricas.resultado >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+            color={metricas.resultado >= 0 ? 'success' : 'danger'}
+          />
+        </div>
+
+        {/* Alerta de contas a vencer - com X para fechar */}
+        {!alertaDismissed && (dashboardData?.contasPagar?.length || 0) > 0 && (
+          <div className="p-3 bg-alerta-light/50 rounded-xl border border-alerta/20 flex items-center gap-3 relative">
+            <button 
+              onClick={() => setAlertaDismissed(true)}
+              className="absolute top-2 right-2 p-1 hover:bg-alerta/10 rounded-full"
+            >
+              <X className="w-4 h-4 text-alerta-dark" />
+            </button>
+            <div className="p-2 bg-alerta-light rounded-lg">
+              <Calendar className="w-5 h-5 text-alerta-dark" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-alerta-dark text-sm">
+                🟡 {dashboardData?.contasPagar?.length || 0} conta(s) a vencer
+              </p>
+              <p className="text-xs text-neutral-600">
+                {dashboardData?.contasPagar?.slice(0, 3).map((c: Conta) => (
+                  <span key={c.id}>{formatarDataCurta(c.data_vencimento)} • </span>
+                ))}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Evolução do Saldo + Saúde do Caixa */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Evolução do Saldo - 2/3 */}
+          <Card className="lg:col-span-2 min-w-0">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-secondary-500" />
-                Seu Salário
-              </CardTitle>
-              <Link href="/salario">
-                <Button variant="ghost" size="sm">
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </Link>
+              <CardTitle className="text-sm sm:text-base">📈 Evolução do Saldo</CardTitle>
+              <div className="flex gap-1">
+                {(['semana', 'mes', 'ano'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setFiltroEvolucao(f)}
+                    className={`px-2 sm:px-3 py-1 text-xs rounded-full transition-all ${
+                      filtroEvolucao === f 
+                        ? 'bg-primary-500 text-white' 
+                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                    }`}
+                  >
+                    {f === 'semana' ? '7D' : f === 'mes' ? '30D' : '1A'}
+                  </button>
+                ))}
+              </div>
             </CardHeader>
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs text-neutral-500">Pró-labore definido</p>
-                <p className="text-lg font-bold">{formatarMoeda(empresa?.prolabore_definido || 0)}</p>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-neutral-500">Retirado</span>
-                <span className="font-medium">{formatarMoeda(prolaboreRetirado)}</span>
-              </div>
-              <div className="h-2 bg-neutral-200 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-secondary-500 rounded-full transition-all"
-                  style={{ width: `${Math.min((prolaboreRetirado / (empresa?.prolabore_definido || 1)) * 100, 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-neutral-500">Disponível</span>
-                <span className={`font-medium ${prolaboreDisponivel < 0 ? 'text-saida' : 'text-entrada'}`}>
-                  {formatarMoeda(Math.max(0, prolaboreDisponivel))}
-                </span>
-              </div>
+            <div className="h-48 sm:h-56 min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dadosGraficos.evolucao}>
+                  <defs>
+                    <linearGradient id="colorSaldo" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="data" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 9 }} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} width={35} />
+                  <Tooltip formatter={(v: number) => formatarMoeda(v)} />
+                  <Area type="monotone" dataKey="saldo" stroke="#06b6d4" fill="url(#colorSaldo)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </Card>
 
-          {/* Evolução do saldo */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Evolução do Saldo (30 dias)</CardTitle>
-            </CardHeader>
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={dadosEvolucao}>
-                <defs>
-                  <linearGradient id="gradientSaldo" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-                <XAxis dataKey="data" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => [formatarMoeda(v), 'Saldo']} />
-                <Area type="monotone" dataKey="saldo" stroke="#06b6d4" fill="url(#gradientSaldo)" />
-              </AreaChart>
-            </ResponsiveContainer>
+          {/* Saúde do Caixa - 1/3 */}
+          <Card className="bg-gradient-to-br from-primary-50 to-secondary-50 flex flex-col justify-center items-center">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="w-5 h-5 text-primary-500" />
+              <span className="font-semibold text-neutral-900">Saúde do Caixa</span>
+            </div>
+            <SaudeCaixa valor={metricas.saudeCaixa} size="lg" />
+            <div className="mt-4 text-sm text-neutral-600 space-y-1 text-center">
+              {metricas.saudeCaixa >= 70 && <p>✅ Saldo positivo</p>}
+              {metricas.resultado >= 0 && <p>✅ Lucro no mês</p>}
+              {contasAtrasadas.length === 0 && <p>✅ Sem atrasos</p>}
+              {contasAtrasadas.length > 0 && <p className="text-saida-dark">❌ {contasAtrasadas.length} atraso(s)</p>}
+            </div>
           </Card>
         </div>
 
-        {/* Gráficos lado a lado */}
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Gastos por categoria */}
+        {/* Comparativo + Gastos por Categoria */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Comparativo Mensal */}
           <Card>
             <CardHeader>
-              <CardTitle>Despesas por Categoria</CardTitle>
+              <CardTitle>📊 Comparativo Mensal</CardTitle>
             </CardHeader>
-            {dadosCategorias.length > 0 ? (
+            <div className="h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dadosGraficos.comparativo}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="mes" tick={{ fontSize: 9 }} />
+                  <YAxis tick={{ fontSize: 9 }} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} width={30} />
+                  <Tooltip formatter={(v: number) => formatarMoeda(v)} />
+                  <Bar dataKey="entradas" name="Entradas" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="saidas" name="Saídas" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex justify-center gap-4 mt-2 text-xs">
+              <span className="flex items-center gap-1"><div className="w-2 h-2 bg-entrada rounded" /> Entradas</span>
+              <span className="flex items-center gap-1"><div className="w-2 h-2 bg-saida rounded" /> Saídas</span>
+            </div>
+          </Card>
+
+          {/* Gastos por Categoria */}
+          {dadosGraficos.categorias.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>🏷️ Gastos por Categoria</CardTitle>
+              </CardHeader>
               <div className="flex flex-col sm:flex-row items-center gap-4">
-                <div className="w-full sm:w-1/2 h-[140px] sm:h-[160px]">
+                <div className="w-40 h-40 flex-shrink-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={dadosCategorias}
+                        data={dadosGraficos.categorias.slice(0, 5)}
                         cx="50%"
                         cy="50%"
                         innerRadius={35}
-                        outerRadius={55}
-                        dataKey="valor"
+                        outerRadius={60}
+                        dataKey="value"
                         paddingAngle={2}
                       >
-                        {dadosCategorias.map((_, i) => (
-                          <Cell key={i} fill={CORES[i % CORES.length]} />
+                        {dadosGraficos.categorias.slice(0, 5).map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={CORES[index % CORES.length]} />
                         ))}
                       </Pie>
                       <Tooltip formatter={(v: number) => formatarMoeda(v)} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="flex-1 w-full space-y-1.5">
-                  {dadosCategorias.slice(0, 5).map((cat, i) => (
-                    <div key={cat.nome} className="flex items-center gap-2 text-xs sm:text-sm">
-                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CORES[i % CORES.length] }} />
-                      <span className="text-neutral-600 truncate flex-1">{cat.nome}</span>
-                      <span className="font-medium text-neutral-900">{formatarMoeda(cat.valor)}</span>
+                <div className="flex-1 space-y-2 w-full">
+                  {dadosGraficos.categorias.slice(0, 5).map((cat, idx) => (
+                    <div key={cat.name} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: CORES[idx % CORES.length] }} />
+                        <span className="text-neutral-600 truncate">{cat.name}</span>
+                      </div>
+                      <span className="font-medium">{formatarMoeda(cat.value)}</span>
                     </div>
                   ))}
                 </div>
               </div>
+            </Card>
+          )}
+        </div>
+
+        {/* Top Produtos + Insights */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Top Produtos - 2/3 */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>🏆 Top Produtos Vendidos</CardTitle>
+              <Link href="/produtos" className="text-xs text-primary-600 hover:text-primary-700 font-medium">
+                Ver todos →
+              </Link>
+            </CardHeader>
+            {dadosGraficos.topProdutos && dadosGraficos.topProdutos.length > 0 ? (
+              <div className="grid sm:grid-cols-2 gap-3">
+                {dadosGraficos.topProdutos.slice(0, 4).map((produto: { nome: string; total: number; qtd: number }, idx: number) => (
+                  <div key={produto.nome} className="flex items-center gap-3 p-2 bg-neutral-50 rounded-xl">
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                      idx === 0 ? 'bg-yellow-100 text-yellow-700' : 
+                      idx === 1 ? 'bg-gray-100 text-gray-600' : 
+                      idx === 2 ? 'bg-orange-100 text-orange-700' : 'bg-neutral-100 text-neutral-500'
+                    }`}>
+                      {idx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-neutral-900 truncate">{produto.nome}</p>
+                      <p className="text-xs text-neutral-500">{produto.qtd} vendas</p>
+                    </div>
+                    <span className="text-sm font-semibold text-entrada-dark">{formatarMoeda(produto.total)}</span>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <EmptyState
-                title="Sem despesas"
-                description="Nenhuma despesa registrada este mês"
-              />
+              <div className="text-center py-6 text-neutral-500">
+                <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Nenhum produto vendido este mês</p>
+              </div>
             )}
           </Card>
 
-          {/* Comparativo semanal */}
-          <Card>
+          {/* Insights - 1/3 */}
+          <Card className="bg-gradient-to-br from-violet-50 to-purple-50">
             <CardHeader>
-              <CardTitle>Comparativo Semanal</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Lightbulb className="w-5 h-5 text-violet-500" />
+                Insights do Mês
+              </CardTitle>
             </CardHeader>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={dadosComparativo}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-                <XAxis dataKey="periodo" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => formatarMoeda(v)} />
-                <Bar dataKey="entradas" fill="#10b981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="saidas" fill="#ef4444" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="space-y-3 text-sm">
+              {/* Maior gasto */}
+              {dadosGraficos.categorias[0] && (
+                <div className="flex items-start gap-2">
+                  <span className="text-lg">💸</span>
+                  <div>
+                    <p className="text-neutral-700 font-medium">Maior gasto</p>
+                    <p className="text-neutral-600">{dadosGraficos.categorias[0].name}: <strong>{formatarMoeda(dadosGraficos.categorias[0].value)}</strong></p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Média diária */}
+              <div className="flex items-start gap-2">
+                <span className="text-lg">📊</span>
+                <div>
+                  <p className="text-neutral-700 font-medium">Média diária</p>
+                  <p className="text-neutral-600">Gasta <strong>{formatarMoeda(metricas.totalSaidas / 30)}</strong>/dia</p>
+                </div>
+              </div>
+
+              {/* Previsão */}
+              <div className="flex items-start gap-2">
+                <span className="text-lg">🔮</span>
+                <div>
+                  <p className="text-neutral-700 font-medium">Previsão</p>
+                  <p className="text-neutral-600">
+                    Saldo fim do mês: <strong className={metricas.resultado >= 0 ? 'text-entrada-dark' : 'text-saida-dark'}>
+                      {formatarMoeda(metricas.saldoAtual)}
+                    </strong>
+                  </p>
+                </div>
+              </div>
+
+              {/* Dica */}
+              <div className="flex items-start gap-2 p-2 bg-white/50 rounded-lg">
+                <span className="text-lg">💡</span>
+                <p className="text-neutral-700">
+                  {metricas.resultado >= 0 
+                    ? 'Mês positivo! Considere guardar o excedente ou investir.'
+                    : `Atenção! Reduza gastos com ${dadosGraficos.categorias[0]?.name || 'despesas'} para equilibrar.`
+                  }
+                </p>
+              </div>
+            </div>
           </Card>
         </div>
 
-        {/* Top Produtos/Serviços Vendidos */}
-        {topProdutos.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                🏆 Top {topProdutos.length} Produtos/Serviços
-              </CardTitle>
-              <Link href="/produtos" className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1">
-                Ver todos
-                <ChevronRight className="w-4 h-4" />
-              </Link>
-            </CardHeader>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              {topProdutos.map((prod, idx) => (
-                <div key={idx} className={`p-3 rounded-xl ${
-                  idx === 0 ? 'bg-gradient-to-br from-yellow-50 to-amber-100 border-2 border-yellow-200' :
-                  idx === 1 ? 'bg-gradient-to-br from-neutral-50 to-neutral-100 border border-neutral-200' :
-                  idx === 2 ? 'bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200' :
-                  'bg-neutral-50'
-                }`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg font-bold text-neutral-400">#{idx + 1}</span>
-                    <span className="font-medium text-neutral-900 truncate text-sm">{prod.nome}</span>
-                  </div>
-                  <div className="text-xs text-neutral-500">
-                    {prod.qtd} {prod.qtd === 1 ? 'venda' : 'vendas'}
-                  </div>
-                  <div className="text-lg font-bold text-entrada-dark">
-                    {formatarMoeda(prod.total)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-
         {/* Contas a Pagar e a Receber - Expandable Cards */}
-        <div className="grid lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Próximas contas a PAGAR */}
           <Card>
             <CardHeader>
@@ -626,7 +642,7 @@ export default function DashboardPage() {
             </CardHeader>
 
             <ExpandableCardList 
-              items={proximasContas.map((conta): ExpandableItem => ({
+              items={(dashboardData?.contasPagar || []).map((conta: Conta): ExpandableItem => ({
                 id: conta.id,
                 title: conta.descricao,
                 subtitle: formatarDataCurta(conta.data_vencimento),
@@ -649,17 +665,12 @@ export default function DashboardPage() {
                       <span className="text-neutral-500">Status:</span>
                       <Badge variant={conta.status === 'atrasado' ? 'saida' : 'alerta'}>{conta.status}</Badge>
                     </div>
-                    {conta.observacao && (
-                      <div className="pt-2 border-t border-neutral-100">
-                        <p className="text-sm text-neutral-500">{conta.observacao}</p>
-                      </div>
-                    )}
                   </div>
                 ),
                 ctaText: '✅ Marcar Pago',
-                ctaAction: () => window.location.href = `/contas?tipo=saida&pagar=${conta.id}`,
+                ctaAction: () => router.push(`/contas?tipo=saida&pagar=${conta.id}`),
                 cta2Text: '📋 Ver Detalhes',
-                cta2Action: () => window.location.href = '/contas?tipo=saida'
+                cta2Action: () => router.push('/contas?tipo=saida')
               }))}
               emptyMessage="Tudo em dia! 🎉 Nenhuma conta a pagar"
             />
@@ -679,7 +690,7 @@ export default function DashboardPage() {
             </CardHeader>
 
             <ExpandableCardList 
-              items={aReceber.map((conta): ExpandableItem => ({
+              items={(dashboardData?.contasReceber || []).map((conta: Conta): ExpandableItem => ({
                 id: conta.id,
                 title: conta.descricao,
                 subtitle: formatarDataCurta(conta.data_vencimento),
@@ -703,9 +714,9 @@ export default function DashboardPage() {
                   </div>
                 ),
                 ctaText: '✅ Marcar Recebido',
-                ctaAction: () => window.location.href = `/contas?tipo=entrada&receber=${conta.id}`,
+                ctaAction: () => router.push(`/contas?tipo=entrada&receber=${conta.id}`),
                 cta2Text: '📋 Ver Detalhes',
-                cta2Action: () => window.location.href = '/contas?tipo=entrada'
+                cta2Action: () => router.push('/contas?tipo=entrada')
               }))}
               emptyMessage="Sem recebimentos previstos"
             />
@@ -727,7 +738,7 @@ export default function DashboardPage() {
             </CardHeader>
 
             <ExpandableCardList 
-              items={ultimosLancamentos.map((lanc): ExpandableItem => ({
+              items={(dashboardData?.lancamentosMes?.slice(0, 5) || []).map((lanc: Lancamento): ExpandableItem => ({
                 id: lanc.id,
                 title: lanc.descricao,
                 subtitle: formatarDataCurta(lanc.data),
@@ -760,15 +771,10 @@ export default function DashboardPage() {
                         <span className="font-medium capitalize">{lanc.forma_pagamento}</span>
                       </div>
                     )}
-                    {lanc.observacao && (
-                      <div className="pt-2 border-t border-neutral-100">
-                        <p className="text-sm text-neutral-500">{lanc.observacao}</p>
-                      </div>
-                    )}
                   </div>
                 ),
                 ctaText: '📝 Ver Detalhes',
-                ctaAction: () => window.location.href = '/lancamentos'
+                ctaAction: () => router.push('/lancamentos')
               }))}
               emptyMessage="Nenhum lançamento ainda. Comece registrando suas entradas e saídas!"
             />

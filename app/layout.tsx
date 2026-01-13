@@ -1,5 +1,6 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
+import { Providers } from '@/components/Providers'
 
 export const metadata: Metadata = {
   title: 'Caixa360 - Gestão Financeira Simples',
@@ -39,7 +40,11 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Caixa360" />
         <link rel="apple-touch-icon" href="/logo.png" />
       </head>
-      <body>{children}</body>
+      <body>
+        <Providers>
+          {children}
+        </Providers>
+      </body>
     </html>
   )
 }

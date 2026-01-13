@@ -81,7 +81,7 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
-        window.location.href = '/dashboard';
+        router.push('/dashboard');
       }
     } else {
       // Cadastro

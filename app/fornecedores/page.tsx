@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState } from '@/components/ui';
 import { formatarMoeda, formatarDataCurta } from '@/lib/utils';
 import { Fornecedor, Lancamento, Conta } from '@/lib/types';
+import { useEmpresa, useFornecedores, invalidateFornecedores } from '@/lib/hooks/useSWRHooks';
 import {
   Plus,
   Package,
@@ -23,11 +24,14 @@ import {
 export default function FornecedoresPage() {
   const supabase = createClient();
   
-  const [loading, setLoading] = useState(true);
-  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
+  // SWR Hooks
+  const { empresa, isLoading: loadingEmpresa } = useEmpresa();
+  const { fornecedores, isLoading: loadingFornecedores, refresh: refreshFornecedores } = useFornecedores(empresa?.id || null);
+  
+  const loading = loadingEmpresa || loadingFornecedores;
+  
   const [lancamentosPorFornecedor, setLancamentosPorFornecedor] = useState<Record<string, number>>({});
   const [contasPorFornecedor, setContasPorFornecedor] = useState<Record<string, number>>({});
-  const [empresaId, setEmpresaId] = useState<string>('');
   
   // Filtros
   const [filtroBusca, setFiltroBusca] = useState('');
@@ -56,33 +60,15 @@ export default function FornecedoresPage() {
   const [observacao, setObservacao] = useState('');
   const [salvando, setSalvando] = useState(false);
 
+  // Carregar totais por fornecedor quando fornecedores mudar
   useEffect(() => {
-    carregarDados();
-  }, []);
+    if (empresa?.id && fornecedores.length > 0) {
+      carregarTotais();
+    }
+  }, [empresa?.id, fornecedores]);
 
-  async function carregarDados() {
-    setLoading(true);
-    
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: empresa } = await supabase
-      .from('empresas')
-      .select('id')
-      .eq('usuario_id', user.id)
-      .single();
-    
-    if (!empresa) return;
-    setEmpresaId(empresa.id);
-
-    // Carregar fornecedores
-    const { data: forns } = await supabase
-      .from('fornecedores')
-      .select('*')
-      .eq('empresa_id', empresa.id)
-      .order('nome');
-    
-    setFornecedores(forns || []);
+  async function carregarTotais() {
+    if (!empresa?.id) return;
 
     // Carregar totais de lançamentos por fornecedor
     const { data: lancamentos } = await supabase
@@ -114,8 +100,6 @@ export default function FornecedoresPage() {
       }
     });
     setContasPorFornecedor(contasTotais);
-    
-    setLoading(false);
   }
 
   async function carregarHistorico(fornecedor: Fornecedor) {
@@ -142,7 +126,7 @@ export default function FornecedoresPage() {
   }
 
   async function handleSalvar() {
-    if (!nome || !empresaId) return;
+    if (!nome || !empresa?.id) return;
     
     setSalvando(true);
     
@@ -162,7 +146,7 @@ export default function FornecedoresPage() {
       await supabase
         .from('fornecedores')
         .insert({
-          empresa_id: empresaId,
+          empresa_id: empresa.id,
           nome,
           categoria: categoria || null,
           contato: contato || null,
@@ -175,14 +159,16 @@ export default function FornecedoresPage() {
     setSalvando(false);
     setShowModal(false);
     limparForm();
-    carregarDados();
+    if (empresa?.id) invalidateFornecedores(empresa.id);
+    refreshFornecedores();
   }
 
   async function handleExcluir(id: string) {
     if (!confirm('Deseja excluir este fornecedor? Os lançamentos vinculados não serão excluídos.')) return;
     
     await supabase.from('fornecedores').delete().eq('id', id);
-    carregarDados();
+    if (empresa?.id) invalidateFornecedores(empresa.id);
+    refreshFornecedores();
   }
 
   // Funções para edição de lançamento no histórico
@@ -216,7 +202,7 @@ export default function FornecedoresPage() {
     setShowEditLancamento(false);
     setLancamentoEditando(null);
     setSalvando(false);
-    carregarDados();
+    carregarTotais();
   }
 
   async function excluirLancamento(id: string) {
@@ -228,7 +214,7 @@ export default function FornecedoresPage() {
     if (fornecedorSelecionado) {
       await carregarHistorico(fornecedorSelecionado);
     }
-    carregarDados();
+    carregarTotais();
   }
 
   function limparForm() {
