@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState } from '@/components/ui';
+import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState, CurrencyInput, currencyToNumber } from '@/components/ui';
 import { formatarMoeda, formatarDataCurta, isAtrasado } from '@/lib/utils';
 import { Conta, Fornecedor, CATEGORIAS_BASE, TipoLancamento, Categoria, StatusConta } from '@/lib/types';
 import {
@@ -98,10 +98,10 @@ export default function ContasPage() {
 
   async function handleSalvar() {
     if (!descricao || !valor || !dataVencimento || !empresaId) return;
-    
+
     setSalvando(true);
-    
-    const valorNum = parseFloat(valor.replace(',', '.'));
+
+    const valorNum = currencyToNumber(valor);
     
     if (editando) {
       await supabase
@@ -189,7 +189,8 @@ export default function ContasPage() {
     setEditando(conta);
     setTipo(conta.tipo);
     setDescricao(conta.descricao);
-    setValor(conta.valor.toString());
+    // Formatar como moeda para o CurrencyInput
+    setValor(Number(conta.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
     setCategoria(conta.categoria as Categoria);
     setDataVencimento(conta.data_vencimento);
     setFornecedorId(conta.fornecedor_id || '');
@@ -212,6 +213,8 @@ export default function ContasPage() {
   const totalAPagar = contas.filter(c => c.tipo === 'saida' && ['pendente', 'atrasado'].includes(c.status)).reduce((a, c) => a + Number(c.valor), 0);
   const totalAReceber = contas.filter(c => c.tipo === 'entrada' && ['pendente', 'atrasado'].includes(c.status)).reduce((a, c) => a + Number(c.valor), 0);
   const totalAtrasado = contas.filter(c => c.status === 'atrasado').reduce((a, c) => a + Number(c.valor), 0);
+  const totalPago = contas.filter(c => c.status === 'pago').reduce((a, c) => a + Number(c.valor), 0);
+  const qtdPagas = contas.filter(c => c.status === 'pago').length;
 
   // Categorias por tipo
   const categoriasTipo = Object.entries(CATEGORIAS_BASE).filter(([_, c]) => c.tipo === tipo);
@@ -253,7 +256,7 @@ export default function ContasPage() {
         </div>
 
         {/* Resumo */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
           <Card className="bg-gradient-to-br from-saida-light to-red-50">
             <p className="text-xs sm:text-sm text-neutral-500">A Pagar</p>
             <p className="text-lg sm:text-2xl font-bold text-saida-dark">{formatarMoeda(totalAPagar)}</p>
@@ -265,6 +268,10 @@ export default function ContasPage() {
           <Card className="bg-gradient-to-br from-alerta-light to-amber-50">
             <p className="text-xs sm:text-sm text-neutral-500">Atrasadas</p>
             <p className="text-lg sm:text-2xl font-bold text-alerta-dark">{formatarMoeda(totalAtrasado)}</p>
+          </Card>
+          <Card className="bg-gradient-to-br from-primary-50 to-cyan-50">
+            <p className="text-xs sm:text-sm text-neutral-500">Pagas ({qtdPagas})</p>
+            <p className="text-lg sm:text-2xl font-bold text-primary-600">{formatarMoeda(totalPago)}</p>
           </Card>
           <Card>
             <p className="text-xs sm:text-sm text-neutral-500">Balanço</p>
@@ -430,11 +437,10 @@ export default function ContasPage() {
               required
             />
 
-            <Input
-              label="Valor (R$)"
-              placeholder="0,00"
+            <CurrencyInput
+              label="Valor"
               value={valor}
-              onChange={(e) => setValor(e.target.value)}
+              onChange={setValor}
               required
             />
 
