@@ -1,24 +1,25 @@
 // Service Worker para Caixa360 - PWA + Push Notifications
 
-const CACHE_NAME = 'caixa360-v2';
+const CACHE_NAME = 'caixa360-v3';
 
+// Apenas arquivos estáticos que existem
 const urlsToCache = [
-  '/',
-  '/dashboard',
-  '/lancamentos',
-  '/contas',
   '/logo.png',
-  '/icon-192.png',
-  '/icon-512.png',
+  '/manifest.json',
 ];
 
-// Instalação
+// Instalação - não falha se alguns recursos não carregarem
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('[SW] Cache aberto');
-        return cache.addAll(urlsToCache);
+        // Cachear individualmente para não falhar tudo se um arquivo não existir
+        return Promise.allSettled(
+          urlsToCache.map(url =>
+            cache.add(url).catch(err => console.warn('[SW] Falha ao cachear:', url, err))
+          )
+        );
       })
   );
   self.skipWaiting();
@@ -75,8 +76,8 @@ self.addEventListener('push', (event) => {
   let data = {
     title: 'Caixa360',
     body: 'Você tem uma nova notificação',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: '/logo.png',
+    badge: '/logo.png',
     tag: 'caixa360-notification',
     data: {},
   };

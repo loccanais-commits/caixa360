@@ -457,7 +457,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         {/* Page Content */}
         <div className={clsx(
-          "p-4 lg:p-8 pb-24 lg:pb-8 transition-all",
+          "p-4 lg:p-8 pb-24 lg:pb-8 transition-all overflow-x-hidden",
           showAssistente && "lg:mr-[400px]"
         )}>
           {children}
