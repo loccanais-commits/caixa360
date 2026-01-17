@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState } from '@/components/ui';
+import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState, CurrencyInput, currencyToNumber } from '@/components/ui';
 import { ExpandableCardList, ExpandableItem } from '@/components/ui/ExpandableCard';
 import { formatarMoeda, formatarDataCurta } from '@/lib/utils';
 import { Lancamento, Fornecedor, Conta, CATEGORIAS_BASE, TipoLancamento, Categoria } from '@/lib/types';
@@ -84,10 +84,10 @@ export default function LancamentosPage() {
 
   async function handleSalvar() {
     if (!descricao || !valor || !empresa?.id) return;
-    
+
     setSalvando(true);
-    
-    const valorNum = parseFloat(valor.replace(',', '.'));
+
+    const valorNum = currencyToNumber(valor);
     
     if (editando) {
       await supabase
@@ -149,7 +149,8 @@ export default function LancamentosPage() {
     setEditando(lanc);
     setTipo(lanc.tipo);
     setDescricao(lanc.descricao);
-    setValor(lanc.valor.toString());
+    // Formatar como moeda para o CurrencyInput
+    setValor(Number(lanc.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
     setCategoria(lanc.categoria as Categoria);
     setData(lanc.data);
     setFornecedorId(lanc.fornecedor_id || '');
@@ -471,11 +472,10 @@ export default function LancamentosPage() {
               required
             />
 
-            <Input
-              label="Valor (R$)"
-              placeholder="0,00"
+            <CurrencyInput
+              label="Valor"
               value={valor}
-              onChange={(e) => setValor(e.target.value)}
+              onChange={setValor}
               required
             />
 

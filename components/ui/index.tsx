@@ -324,6 +324,107 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
   );
 }
 
+// ==================== CONFIRM MODAL ====================
+
+interface ConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  variant?: 'danger' | 'warning' | 'info';
+  loading?: boolean;
+}
+
+export function ConfirmModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmText = 'Confirmar',
+  cancelText = 'Cancelar',
+  variant = 'danger',
+  loading = false,
+}: ConfirmModalProps) {
+  if (!isOpen) return null;
+
+  const iconColors = {
+    danger: 'text-saida bg-saida-light',
+    warning: 'text-alerta bg-alerta-light',
+    info: 'text-primary-500 bg-primary-100',
+  };
+
+  const buttonVariants = {
+    danger: 'bg-saida hover:bg-saida-dark text-white',
+    warning: 'bg-alerta hover:bg-alerta-dark text-white',
+    info: 'bg-primary-500 hover:bg-primary-600 text-white',
+  };
+
+  const icons = {
+    danger: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+      </svg>
+    ),
+    warning: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    ),
+    info: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl animate-slide-up p-6">
+        <div className="flex items-start gap-4">
+          <div className={clsx('p-3 rounded-full flex-shrink-0', iconColors[variant])}>
+            {icons[variant]}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
+            <p className="mt-2 text-sm text-neutral-600">{message}</p>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6 justify-end">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {cancelText}
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className={clsx(
+              'px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2',
+              buttonVariants[variant]
+            )}
+          >
+            {loading && (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            )}
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ==================== EMPTY STATE ====================
 
 interface EmptyStateProps {
@@ -419,6 +520,82 @@ export function Avatar({ name, size = 'md', className }: AvatarProps) {
       {initials}
     </div>
   );
+}
+
+// ==================== CURRENCY INPUT ====================
+
+interface CurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
+  label?: string;
+  error?: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+export function CurrencyInput({ label, error, value, onChange, className, ...props }: CurrencyInputProps) {
+  const formatCurrency = (val: string) => {
+    // Remove tudo exceto números
+    let numbers = val.replace(/\D/g, '');
+
+    // Se vazio, retorna vazio
+    if (!numbers) return '';
+
+    // Converte para número e divide por 100 para ter centavos
+    const numValue = parseInt(numbers, 10) / 100;
+
+    // Formata como moeda brasileira
+    return numValue.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCurrency(e.target.value);
+    onChange(formatted);
+  };
+
+  // Converte o valor formatado de volta para número (para salvar no banco)
+  const getNumericValue = () => {
+    if (!value) return 0;
+    return parseFloat(value.replace(/\./g, '').replace(',', '.')) || 0;
+  };
+
+  return (
+    <div className="w-full">
+      {label && (
+        <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+          {label}
+        </label>
+      )}
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 font-medium">
+          R$
+        </span>
+        <input
+          type="text"
+          inputMode="numeric"
+          className={clsx(
+            'w-full pl-10 pr-4 py-2.5 border border-neutral-200 rounded-xl text-neutral-900',
+            'placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
+            'transition-all duration-200 text-right font-medium',
+            error && 'border-saida focus:ring-saida',
+            className
+          )}
+          value={value}
+          onChange={handleChange}
+          placeholder="0,00"
+          {...props}
+        />
+      </div>
+      {error && <p className="mt-1 text-sm text-saida">{error}</p>}
+    </div>
+  );
+}
+
+// Helper para converter valor formatado para número
+export function currencyToNumber(value: string): number {
+  if (!value) return 0;
+  return parseFloat(value.replace(/\./g, '').replace(',', '.')) || 0;
 }
 
 // ==================== PROGRESS BAR ====================

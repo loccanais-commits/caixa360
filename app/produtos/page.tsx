@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState } from '@/components/ui';
+import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState, CurrencyInput, currencyToNumber, ConfirmModal } from '@/components/ui';
 import { formatarMoeda } from '@/lib/utils';
 import { Produto, TipoProduto } from '@/lib/types';
 import { useEmpresa, useProdutos, useFornecedores, invalidateProdutos } from '@/lib/hooks/useSWRHooks';
@@ -17,8 +17,10 @@ import {
   Briefcase,
   TrendingUp,
   AlertTriangle,
-  BarChart3
+  BarChart3,
+  PlusCircle
 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function ProdutosPage() {
   const supabase = createClient();
@@ -95,8 +97,8 @@ export default function ProdutosPage() {
       empresa_id: empresa.id,
       nome: nome.trim(),
       tipo,
-      preco: parseFloat(preco) || 0,
-      custo: custo ? parseFloat(custo) : null,
+      preco: currencyToNumber(preco),
+      custo: custo ? currencyToNumber(custo) : null,
       estoque: tipo === 'produto' && estoque ? parseInt(estoque) : null,
       estoque_minimo: tipo === 'produto' && estoqueMinimo ? parseInt(estoqueMinimo) : null,
       categoria: categoria || null,
@@ -155,8 +157,9 @@ export default function ProdutosPage() {
     setEditando(prod);
     setNome(prod.nome);
     setTipo(prod.tipo);
-    setPreco(String(prod.preco));
-    setCusto(prod.custo ? String(prod.custo) : '');
+    // Formatar como moeda para o CurrencyInput
+    setPreco(prod.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    setCusto(prod.custo ? prod.custo.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
     setEstoque(prod.estoque ? String(prod.estoque) : '');
     setEstoqueMinimo(prod.estoque_minimo ? String(prod.estoque_minimo) : '');
     setCategoria(prod.categoria || '');
@@ -459,22 +462,16 @@ export default function ProdutosPage() {
             />
 
             <div className="grid grid-cols-2 gap-3">
-              <Input
+              <CurrencyInput
                 label="Preço de Venda"
-                type="number"
-                step="0.01"
-                placeholder="0,00"
                 value={preco}
-                onChange={(e) => setPreco(e.target.value)}
+                onChange={setPreco}
                 required
               />
-              <Input
+              <CurrencyInput
                 label="Custo (opcional)"
-                type="number"
-                step="0.01"
-                placeholder="0,00"
                 value={custo}
-                onChange={(e) => setCusto(e.target.value)}
+                onChange={setCusto}
               />
             </div>
 
@@ -498,12 +495,35 @@ export default function ProdutosPage() {
               </div>
             )}
 
-            <Input
-              label="Categoria (opcional)"
-              placeholder="Ex: Cabelo, Unha, Eletrônicos..."
-              value={categoria}
-              onChange={(e) => setCategoria(e.target.value)}
-            />
+            {/* Categoria com opção de criar nova */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-neutral-700">
+                  Categoria (opcional)
+                </label>
+                <Link
+                  href="/categorias"
+                  className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                >
+                  <PlusCircle className="w-3 h-3" />
+                  Nova categoria
+                </Link>
+              </div>
+              <input
+                type="text"
+                list="categorias-list"
+                placeholder="Ex: Cabelo, Unha, Eletrônicos..."
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+                className="w-full px-4 py-2.5 border border-neutral-200 rounded-xl text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+              />
+              <datalist id="categorias-list">
+                {/* Categorias únicas dos produtos existentes */}
+                {Array.from(new Set(produtos.map(p => p.categoria).filter(Boolean))).map(cat => (
+                  <option key={cat} value={cat || ''} />
+                ))}
+              </datalist>
+            </div>
 
             {/* Fornecedor */}
             <div>
@@ -532,11 +552,11 @@ export default function ProdutosPage() {
             </div>
 
             {/* Preview de lucro */}
-            {preco && custo && parseFloat(preco) > 0 && parseFloat(custo) > 0 && (
+            {preco && custo && currencyToNumber(preco) > 0 && currencyToNumber(custo) > 0 && (
               <div className="p-3 bg-entrada-light rounded-xl">
                 <p className="text-sm text-entrada-dark">
-                  <strong>Lucro por unidade:</strong> {formatarMoeda(parseFloat(preco) - parseFloat(custo))}
-                  {' '}({(((parseFloat(preco) - parseFloat(custo)) / parseFloat(preco)) * 100).toFixed(0)}% de margem)
+                  <strong>Lucro por unidade:</strong> {formatarMoeda(currencyToNumber(preco) - currencyToNumber(custo))}
+                  {' '}({(((currencyToNumber(preco) - currencyToNumber(custo)) / currencyToNumber(preco)) * 100).toFixed(0)}% de margem)
                 </p>
               </div>
             )}
