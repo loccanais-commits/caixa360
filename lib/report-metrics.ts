@@ -112,9 +112,20 @@ export function calcularMetricas(
   dataFim: string,
   lancamentosAnteriores?: Lancamento[] // Para comparação
 ): ReportMetrics {
+  // Validar datas - usar valores padrão se inválidas
+  const dataInicioDate = dataInicio ? new Date(dataInicio) : new Date();
+  const dataFimDate = dataFim ? new Date(dataFim) : new Date();
+
+  const dataInicioValida = !isNaN(dataInicioDate.getTime())
+    ? dataInicio
+    : format(new Date(), 'yyyy-MM-dd');
+  const dataFimValida = !isNaN(dataFimDate.getTime())
+    ? dataFim
+    : format(new Date(), 'yyyy-MM-dd');
+
   // Filtrar por período
   const lancsFiltrados = lancamentos.filter(
-    l => l.data >= dataInicio && l.data <= dataFim
+    l => l.data >= dataInicioValida && l.data <= dataFimValida
   );
 
   // Totais básicos
@@ -131,24 +142,24 @@ export function calcularMetricas(
     : 0;
 
   // Dias do período
-  const diasPeriodo = differenceInDays(new Date(dataFim), new Date(dataInicio)) + 1;
+  const diasPeriodo = Math.max(1, differenceInDays(new Date(dataFimValida), new Date(dataInicioValida)) + 1);
 
   // Burn Rate (gasto diário médio)
   const burnRate = diasPeriodo > 0 ? totalSaidas / diasPeriodo : 0;
 
   // Saldo atual
   const saldoAtual = saldoInicial +
-    lancamentos.filter(l => l.data <= dataFim)
+    lancamentos.filter(l => l.data <= dataFimValida)
       .reduce((a, l) => a + (l.tipo === 'entrada' ? Number(l.valor) : -Number(l.valor)), 0);
 
   // Runway (dias que o caixa aguenta)
-  const runway = burnRate > 0 ? Math.floor(saldoAtual / burnRate) : 999;
+  const runway = burnRate > 0 ? Math.floor(Math.max(0, saldoAtual) / burnRate) : 999;
 
   // Ticket médio
   const ticketMedio = entradas.length > 0 ? totalEntradas / entradas.length : 0;
 
   // Dias com saldo negativo
-  const evolucaoDiaria = calcularEvolucaoDiaria(lancsFiltrados, saldoInicial, dataInicio, dataFim);
+  const evolucaoDiaria = calcularEvolucaoDiaria(lancsFiltrados, saldoInicial, dataInicioValida, dataFimValida);
   const diasSaldoNegativo = evolucaoDiaria.filter(d => d.saldoAcumulado < 0).length;
 
   // Crescimento vs período anterior
@@ -262,6 +273,19 @@ function calcularEvolucaoDiaria(
   dataInicio: string,
   dataFim: string
 ): DailyData[] {
+  // Validar datas
+  if (!dataInicio || !dataFim) {
+    return [];
+  }
+
+  const currentDate = new Date(dataInicio);
+  const endDate = new Date(dataFim);
+
+  // Verificar se as datas são válidas
+  if (isNaN(currentDate.getTime()) || isNaN(endDate.getTime())) {
+    return [];
+  }
+
   const porDia: Record<string, { entradas: number; saidas: number }> = {};
 
   lancamentos.forEach(l => {
@@ -277,10 +301,10 @@ function calcularEvolucaoDiaria(
 
   const resultado: DailyData[] = [];
   let saldoAcumulado = saldoInicial;
-  let currentDate = new Date(dataInicio);
-  const endDate = new Date(dataFim);
 
-  while (currentDate <= endDate) {
+  // Limitar a 60 dias para evitar loops infinitos
+  let maxDias = 60;
+  while (currentDate <= endDate && maxDias > 0) {
     const dataStr = format(currentDate, 'yyyy-MM-dd');
     const dia = porDia[dataStr] || { entradas: 0, saidas: 0 };
     const saldo = dia.entradas - dia.saidas;
@@ -296,6 +320,7 @@ function calcularEvolucaoDiaria(
     });
 
     currentDate.setDate(currentDate.getDate() + 1);
+    maxDias--;
   }
 
   return resultado;
