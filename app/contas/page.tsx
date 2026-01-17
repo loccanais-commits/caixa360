@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState, CurrencyInput, currencyToNumber } from '@/components/ui';
+import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState, CurrencyInput, currencyToNumber, ConfirmModal } from '@/components/ui';
 import { formatarMoeda, formatarDataCurta, isAtrasado } from '@/lib/utils';
 import { Conta, Fornecedor, CATEGORIAS_BASE, TipoLancamento, Categoria, StatusConta } from '@/lib/types';
 import {
@@ -47,6 +47,12 @@ export default function ContasPage() {
   const [recorrente, setRecorrente] = useState(false);
   const [observacao, setObservacao] = useState('');
   const [salvando, setSalvando] = useState(false);
+
+  // Confirm Modal
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; conta: Conta | null }>({
+    isOpen: false,
+    conta: null,
+  });
 
   useEffect(() => {
     carregarDados();
@@ -167,9 +173,14 @@ export default function ContasPage() {
     carregarDados();
   }
 
-  async function handleExcluir(id: string) {
-    if (!confirm('Deseja excluir esta conta?')) return;
-    await supabase.from('contas').delete().eq('id', id);
+  async function handleExcluir(conta: Conta) {
+    setConfirmDelete({ isOpen: true, conta });
+  }
+
+  async function confirmarExclusao() {
+    if (!confirmDelete.conta) return;
+    await supabase.from('contas').delete().eq('id', confirmDelete.conta.id);
+    setConfirmDelete({ isOpen: false, conta: null });
     carregarDados();
   }
 
@@ -371,7 +382,7 @@ export default function ContasPage() {
                         <Edit className="w-4 h-4 text-neutral-500" />
                       </button>
                       <button 
-                        onClick={() => handleExcluir(conta.id)}
+                        onClick={() => handleExcluir(conta)}
                         className="p-2 hover:bg-saida-light rounded-lg transition-colors"
                       >
                         <Trash2 className="w-4 h-4 text-saida" />
@@ -506,6 +517,17 @@ export default function ContasPage() {
             </div>
           </div>
         </Modal>
+
+        {/* Confirm Delete Modal */}
+        <ConfirmModal
+          isOpen={confirmDelete.isOpen}
+          onClose={() => setConfirmDelete({ isOpen: false, conta: null })}
+          onConfirm={confirmarExclusao}
+          title="Excluir conta"
+          message={`Tem certeza que deseja excluir a conta "${confirmDelete.conta?.descricao}"? Esta ação não pode ser desfeita.`}
+          confirmText="Excluir"
+          variant="danger"
+        />
       </div>
     </AppLayout>
   );

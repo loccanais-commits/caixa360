@@ -1,7 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, getRequestIdentifier } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate Limiting - 10 requisições por minuto
+    const identifier = getRequestIdentifier(request);
+    const rateLimitResult = checkRateLimit(identifier, {
+      maxRequests: 10,
+      windowMs: 60000, // 1 minuto
+    });
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Limite de requisições excedido',
+          resposta: `Aguarde ${rateLimitResult.resetIn} segundos antes de enviar outra mensagem.`
+        },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': rateLimitResult.resetIn.toString(),
+          }
+        }
+      );
+    }
+
     const { mensagem, contexto } = await request.json();
 
     if (!mensagem) {

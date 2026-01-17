@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState, CurrencyInput, currencyToNumber } from '@/components/ui';
+import { Card, CardHeader, CardTitle, Button, Input, Select, Badge, Modal, Loading, EmptyState, CurrencyInput, currencyToNumber, ConfirmModal } from '@/components/ui';
 import { formatarMoeda } from '@/lib/utils';
 import { Produto, TipoProduto } from '@/lib/types';
 import { useEmpresa, useProdutos, useFornecedores, invalidateProdutos } from '@/lib/hooks/useSWRHooks';
