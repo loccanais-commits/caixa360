@@ -431,11 +431,13 @@ export default function RelatorioPage() {
               <p className="text-sm text-neutral-600">{empresa?.nome}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm">
-                Período: {formatarDataCurta(dataInicio)} a {formatarDataCurta(dataFim)}
-              </p>
+              {dataInicio && dataFim && (
+                <p className="text-sm">
+                  Período: {formatarDataCurta(dataInicio)} a {formatarDataCurta(dataFim)}
+                </p>
+              )}
               <p className="text-xs text-neutral-400">
-                Gerado em: {formatarDataCurta(new Date().toISOString())}
+                Gerado em: {new Date().toLocaleDateString('pt-BR')}
               </p>
             </div>
           </div>

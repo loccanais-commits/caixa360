@@ -22,27 +22,50 @@ export function formatarMoedaCurta(valor: number): string {
 
 // ==================== FORMATAÇÃO DE DATA ====================
 
-export function formatarData(data: string | Date): string {
+export function formatarData(data: string | Date | undefined | null): string {
+  if (!data) return '-';
+
   const d = typeof data === 'string' ? new Date(data + 'T00:00:00') : data;
+
+  // Verificar se a data é válida
+  if (isNaN(d.getTime())) return '-';
+
   return format(d, "dd/MM/yyyy", { locale: ptBR });
 }
 
-export function formatarDataCurta(data: string | Date): string {
+export function formatarDataCurta(data: string | Date | undefined | null): string {
+  if (!data) return '-';
+
   const d = typeof data === 'string' ? new Date(data + 'T00:00:00') : data;
-  
+
+  // Verificar se a data é válida
+  if (isNaN(d.getTime())) return '-';
+
   if (isToday(d)) return 'Hoje';
   if (isTomorrow(d)) return 'Amanhã';
-  
+
   return format(d, "dd 'de' MMM", { locale: ptBR });
 }
 
-export function formatarDataRelativa(data: string | Date): string {
+export function formatarDataRelativa(data: string | Date | undefined | null): string {
+  if (!data) return '-';
+
   const d = typeof data === 'string' ? new Date(data + 'T00:00:00') : data;
+
+  // Verificar se a data é válida
+  if (isNaN(d.getTime())) return '-';
+
   return formatDistanceToNow(d, { addSuffix: true, locale: ptBR });
 }
 
-export function formatarMesAno(data: string | Date): string {
+export function formatarMesAno(data: string | Date | undefined | null): string {
+  if (!data) return '-';
+
   const d = typeof data === 'string' ? new Date(data + 'T00:00:00') : data;
+
+  // Verificar se a data é válida
+  if (isNaN(d.getTime())) return '-';
+
   return format(d, "MMMM 'de' yyyy", { locale: ptBR });
 }
 
