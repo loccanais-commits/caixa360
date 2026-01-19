@@ -46,6 +46,7 @@ interface DataContextType {
 }
 
 const CACHE_DURATION = 60000; // 1 minute
+const MAX_CACHE_ITEMS = 1000; // Limite máximo de itens por coleção
 
 const DataContext = createContext<DataContextType | null>(null);
 
@@ -103,91 +104,104 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Refresh lancamentos
   const refreshLancamentos = useCallback(async (force = false) => {
-    if (!force && !isCacheStale('lancamentos') && cache.lancamentos.length > 0) {
-      return;
-    }
-    
     const empresaId = await getEmpresaId();
     if (!empresaId) return;
-    
+
+    // Verificar cache apenas se não forçado
+    if (!force) {
+      const cacheStale = isCacheStale('lancamentos');
+      if (!cacheStale) return;
+    }
+
     const { data } = await supabase
       .from('lancamentos')
       .select('*')
       .eq('empresa_id', empresaId)
-      .order('data', { ascending: false });
-    
+      .order('data', { ascending: false })
+      .limit(MAX_CACHE_ITEMS);
+
     setCache(prev => ({
       ...prev,
       lancamentos: data || [],
       lastUpdated: { ...prev.lastUpdated, lancamentos: Date.now() }
     }));
-  }, [cache.lancamentos.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase]);
 
   // Refresh fornecedores
   const refreshFornecedores = useCallback(async (force = false) => {
-    if (!force && !isCacheStale('fornecedores') && cache.fornecedores.length > 0) {
-      return;
-    }
-    
     const empresaId = await getEmpresaId();
     if (!empresaId) return;
-    
+
+    if (!force) {
+      const cacheStale = isCacheStale('fornecedores');
+      if (!cacheStale) return;
+    }
+
     const { data } = await supabase
       .from('fornecedores')
       .select('*')
       .eq('empresa_id', empresaId)
-      .order('nome');
-    
+      .order('nome')
+      .limit(MAX_CACHE_ITEMS);
+
     setCache(prev => ({
       ...prev,
       fornecedores: data || [],
       lastUpdated: { ...prev.lastUpdated, fornecedores: Date.now() }
     }));
-  }, [cache.fornecedores.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase]);
 
   // Refresh contas
   const refreshContas = useCallback(async (force = false) => {
-    if (!force && !isCacheStale('contas') && cache.contas.length > 0) {
-      return;
-    }
-    
     const empresaId = await getEmpresaId();
     if (!empresaId) return;
-    
+
+    if (!force) {
+      const cacheStale = isCacheStale('contas');
+      if (!cacheStale) return;
+    }
+
     const { data } = await supabase
       .from('contas')
       .select('*')
       .eq('empresa_id', empresaId)
-      .order('data_vencimento', { ascending: true });
-    
+      .order('data_vencimento', { ascending: true })
+      .limit(MAX_CACHE_ITEMS);
+
     setCache(prev => ({
       ...prev,
       contas: data || [],
       lastUpdated: { ...prev.lastUpdated, contas: Date.now() }
     }));
-  }, [cache.contas.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase]);
 
   // Refresh produtos
   const refreshProdutos = useCallback(async (force = false) => {
-    if (!force && !isCacheStale('produtos') && cache.produtos.length > 0) {
-      return;
-    }
-    
     const empresaId = await getEmpresaId();
     if (!empresaId) return;
-    
+
+    if (!force) {
+      const cacheStale = isCacheStale('produtos');
+      if (!cacheStale) return;
+    }
+
     const { data } = await supabase
       .from('produtos')
       .select('*')
       .eq('empresa_id', empresaId)
-      .order('nome');
-    
+      .order('nome')
+      .limit(MAX_CACHE_ITEMS);
+
     setCache(prev => ({
       ...prev,
       produtos: data || [],
       lastUpdated: { ...prev.lastUpdated, produtos: Date.now() }
     }));
-  }, [cache.produtos.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase]);
 
   // Refresh all
   const refreshAll = useCallback(async (force = false) => {

@@ -81,8 +81,9 @@ export function validarCPF(cpf: string): boolean {
 // ==================== VALIDAÇÃO DE EMAIL ====================
 
 export function validarEmail(email: string): boolean {
-  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return regex.test(email);
+  // Regex mais robusto baseado em RFC 5322 (simplificado)
+  const regex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  return regex.test(email) && email.length <= 254;
 }
 
 // ==================== VALIDAÇÃO DE TELEFONE ====================
@@ -102,17 +103,28 @@ export function formatarTelefone(telefone: string): string {
 
 // ==================== SANITIZAÇÃO ====================
 
+// Mapa de entidades HTML para sanitização
+const HTML_ENTITIES: Record<string, string> = {
+  '<': '&lt;',
+  '>': '&gt;',
+  '&': '&amp;',
+  '"': '&quot;',
+  "'": '&#x27;',
+  '`': '&#x60;',
+  '/': '&#x2F;',
+};
+
 export function sanitizarTexto(texto: string): string {
   return texto
     .trim()
-    .replace(/[<>]/g, '') // Remove < e > para evitar XSS básico
+    .replace(/[<>&"'`/]/g, (char) => HTML_ENTITIES[char] || char)
     .slice(0, 1000); // Limita tamanho
 }
 
 export function sanitizarDescricao(descricao: string): string {
   return descricao
     .trim()
-    .replace(/[<>]/g, '')
+    .replace(/[<>&"'`/]/g, (char) => HTML_ENTITIES[char] || char)
     .slice(0, 500);
 }
 
@@ -137,7 +149,11 @@ export function validarData(data: string): boolean {
   if (!regex.test(data)) return false;
 
   const d = new Date(data + 'T00:00:00');
-  return !isNaN(d.getTime());
+  if (isNaN(d.getTime())) return false;
+
+  // Verificar se a data está em um intervalo razoável (1900-2100)
+  const year = d.getFullYear();
+  return year >= 1900 && year <= 2100;
 }
 
 export function validarDataFutura(data: string): boolean {

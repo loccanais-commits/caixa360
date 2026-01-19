@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardHeader, CardTitle, StatCard, Button, Badge, EmptyState, Loading, Modal } from '@/components/ui';
@@ -230,12 +230,19 @@ export default function DashboardPage() {
 
   // Mostrar alertas quando tiver contas atrasadas
   const contasAtrasadas = dashboardData?.contasAtrasadas || [];
-  if (contasAtrasadas.length > 0 && !alertasVistos && !loadingDashboard) {
-    setTimeout(() => {
-      setShowAlertas(true);
-      setAlertasVistos(true);
-    }, 500);
-  }
+
+  // useEffect para setTimeout com cleanup adequado
+  useEffect(() => {
+    if (contasAtrasadas.length > 0 && !alertasVistos && !loadingDashboard) {
+      const timeoutId = setTimeout(() => {
+        setShowAlertas(true);
+        setAlertasVistos(true);
+      }, 500);
+
+      // Cleanup function para evitar memory leak
+      return () => clearTimeout(timeoutId);
+    }
+  }, [contasAtrasadas.length, alertasVistos, loadingDashboard]);
 
   // Loading
   const isLoading = loadingEmpresa || (loadingDashboard && !dashboardData);

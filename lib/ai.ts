@@ -1,22 +1,32 @@
 // Serviço de IA - Integração com X.AI (Grok)
+// NOTA: API Key agora é gerenciada apenas no servidor via env vars (XAI_API_KEY)
+// Todas as chamadas à IA devem passar pelas APIs do backend
 
 import { Lancamento, Categoria, CATEGORIAS } from './types';
 
 const XAI_API_URL = 'https://api.x.ai/v1/chat/completions';
 
-// A chave da API deve ser configurada pelo usuário nas configurações
+// API Key é obtida apenas do servidor (process.env.XAI_API_KEY)
+// Funções legadas mantidas para compatibilidade, mas não armazenam mais em localStorage
 export function getApiKey(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('caixaclaro_xai_api_key');
+  // Retorna null no cliente - API key só existe no servidor
+  if (typeof window !== 'undefined') return null;
+  return process.env.XAI_API_KEY || null;
 }
 
-export function setApiKey(key: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('caixaclaro_xai_api_key', key);
+export function setApiKey(_key: string): void {
+  // Função desabilitada por segurança
+  // API key deve ser configurada via variáveis de ambiente no servidor
+  console.warn('setApiKey está desabilitada. Configure XAI_API_KEY no servidor.');
 }
 
 export function hasApiKey(): boolean {
-  return !!getApiKey();
+  // No cliente, verificar via API do backend
+  if (typeof window !== 'undefined') {
+    // Retorna false no cliente - use as APIs do backend
+    return false;
+  }
+  return !!process.env.XAI_API_KEY;
 }
 
 // Interface para resposta da IA

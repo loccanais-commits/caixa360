@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkRateLimit, getRequestIdentifier } from '@/lib/rate-limit';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { requireAuth } from '@/lib/auth-helpers';
 
 export async function POST(request: NextRequest) {
   try {
-    // Rate Limiting - 10 requisições por minuto
-    const identifier = getRequestIdentifier(request);
+    // Verificar autenticação
+    const auth = await requireAuth();
+    if (auth.error) {
+      return auth.error;
+    }
+    const userId = auth.user.id;
+
+    // Rate Limiting - 10 requisições por minuto (por usuário)
+    const identifier = `user:${userId}`;
     const rateLimitResult = checkRateLimit(identifier, {
       maxRequests: 10,
       windowMs: 60000, // 1 minuto
