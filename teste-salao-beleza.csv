@@ -1,0 +1,101 @@
+Data,Descrição,Valor,Tipo,Categoria,Forma Pagamento
+2025-01-02,Corte Feminino - Maria Silva,80.00,entrada,servicos,pix
+2025-01-02,Corte Feminino - Ana Santos,80.00,entrada,servicos,cartao
+2025-01-02,Corte Masculino - João Pedro,45.00,entrada,servicos,dinheiro
+2025-01-02,Escova - Carla Mendes,50.00,entrada,servicos,pix
+2025-01-02,Manicure - Fernanda Lima,35.00,entrada,servicos,dinheiro
+2025-01-02,Pedicure - Fernanda Lima,40.00,entrada,servicos,dinheiro
+2025-01-03,Progressiva - Juliana Costa,250.00,entrada,servicos,cartao
+2025-01-03,Coloração - Patricia Rocha,150.00,entrada,servicos,pix
+2025-01-03,Corte Feminino - Beatriz Alves,80.00,entrada,servicos,cartao
+2025-01-03,Corte Masculino - Ricardo Souza,45.00,entrada,servicos,pix
+2025-01-03,Corte Masculino - Bruno Oliveira,45.00,entrada,servicos,dinheiro
+2025-01-03,Escova - Marina Santos,50.00,entrada,servicos,pix
+2025-01-03,Manicure - Lucia Ferreira,35.00,entrada,servicos,cartao
+2025-01-04,Corte Feminino - Amanda Ribeiro,80.00,entrada,servicos,pix
+2025-01-04,Corte Feminino - Camila Dias,80.00,entrada,servicos,pix
+2025-01-04,Progressiva - Renata Gomes,250.00,entrada,servicos,cartao
+2025-01-04,Escova - Daniela Martins,50.00,entrada,servicos,dinheiro
+2025-01-04,Manicure - Sandra Pereira,35.00,entrada,servicos,pix
+2025-01-04,Pedicure - Sandra Pereira,40.00,entrada,servicos,pix
+2025-01-04,Design Sobrancelha - Tatiane Moura,25.00,entrada,servicos,dinheiro
+2025-01-05,Aluguel do Salão,2500.00,saida,aluguel,transferencia
+2025-01-05,Conta de Luz - Enel,450.00,saida,energia,pix
+2025-01-05,Conta de Água - Sabesp,120.00,saida,agua,pix
+2025-01-05,Internet - Vivo,150.00,saida,internet,boleto
+2025-01-06,Corte Feminino - Vanessa Cruz,80.00,entrada,servicos,cartao
+2025-01-06,Corte Masculino - Felipe Nunes,45.00,entrada,servicos,pix
+2025-01-06,Coloração - Cristina Barbosa,150.00,entrada,servicos,cartao
+2025-01-06,Escova - Roberta Campos,50.00,entrada,servicos,pix
+2025-01-06,Manicure - Elaine Vieira,35.00,entrada,servicos,dinheiro
+2025-01-06,Pedicure - Elaine Vieira,40.00,entrada,servicos,dinheiro
+2025-01-07,Produtos L'Oréal - Distribuidora,850.00,saida,fornecedores,boleto
+2025-01-07,Corte Feminino - Priscila Ramos,80.00,entrada,servicos,pix
+2025-01-07,Corte Feminino - Fabiana Lopes,80.00,entrada,servicos,cartao
+2025-01-07,Progressiva - Michele Cardoso,250.00,entrada,servicos,pix
+2025-01-07,Corte Masculino - Diego Fernandes,45.00,entrada,servicos,dinheiro
+2025-01-07,Escova - Adriana Teixeira,50.00,entrada,servicos,cartao
+2025-01-08,Corte Feminino - Simone Araújo,80.00,entrada,servicos,pix
+2025-01-08,Corte Masculino - Leandro Costa,45.00,entrada,servicos,pix
+2025-01-08,Corte Masculino - Marcelo Lima,45.00,entrada,servicos,cartao
+2025-01-08,Coloração - Viviane Sousa,150.00,entrada,servicos,cartao
+2025-01-08,Manicure - Rosana Duarte,35.00,entrada,servicos,dinheiro
+2025-01-08,Pedicure - Rosana Duarte,40.00,entrada,servicos,dinheiro
+2025-01-08,Design Sobrancelha - Aline Moreira,25.00,entrada,servicos,pix
+2025-01-09,Salário Funcionária Maria,1800.00,saida,salarios,transferencia
+2025-01-09,Corte Feminino - Thais Correia,80.00,entrada,servicos,pix
+2025-01-09,Corte Feminino - Leticia Pinto,80.00,entrada,servicos,cartao
+2025-01-09,Escova - Natalia Rezende,50.00,entrada,servicos,pix
+2025-01-09,Manicure - Claudia Freitas,35.00,entrada,servicos,cartao
+2025-01-10,Corte Feminino - Renata Azevedo,80.00,entrada,servicos,pix
+2025-01-10,Progressiva - Gabriela Monteiro,250.00,entrada,servicos,cartao
+2025-01-10,Corte Masculino - Anderson Reis,45.00,entrada,servicos,dinheiro
+2025-01-10,Corte Masculino - Rodrigo Almeida,45.00,entrada,servicos,pix
+2025-01-10,Escova - Mariana Cunha,50.00,entrada,servicos,cartao
+2025-01-10,Coloração - Isabela Machado,150.00,entrada,servicos,pix
+2025-01-11,Material de Limpeza,95.00,saida,manutencao,dinheiro
+2025-01-11,Corte Feminino - Debora Nascimento,80.00,entrada,servicos,pix
+2025-01-11,Corte Feminino - Caroline Medeiros,80.00,entrada,servicos,cartao
+2025-01-11,Corte Masculino - Gustavo Carvalho,45.00,entrada,servicos,pix
+2025-01-11,Manicure - Regina Santana,35.00,entrada,servicos,dinheiro
+2025-01-11,Pedicure - Regina Santana,40.00,entrada,servicos,dinheiro
+2025-01-12,Corte Feminino - Paula Figueiredo,80.00,entrada,servicos,cartao
+2025-01-12,Progressiva - Bianca Tavares,250.00,entrada,servicos,pix
+2025-01-12,Escova - Rafaela Nogueira,50.00,entrada,servicos,pix
+2025-01-12,Coloração - Monique Andrade,150.00,entrada,servicos,cartao
+2025-01-12,Design Sobrancelha - Jéssica Borges,25.00,entrada,servicos,dinheiro
+2025-01-13,Pró-labore - Retirada,2000.00,saida,prolabore,transferencia
+2025-01-13,Corte Feminino - Larissa Farias,80.00,entrada,servicos,pix
+2025-01-13,Corte Masculino - Thiago Prado,45.00,entrada,servicos,cartao
+2025-01-13,Corte Masculino - Lucas Menezes,45.00,entrada,servicos,pix
+2025-01-13,Escova - Milena Castro,50.00,entrada,servicos,dinheiro
+2025-01-14,Corte Feminino - Ingrid Vasconcelos,80.00,entrada,servicos,pix
+2025-01-14,Corte Feminino - Bruna Cavalcanti,80.00,entrada,servicos,cartao
+2025-01-14,Progressiva - Karina Brito,250.00,entrada,servicos,cartao
+2025-01-14,Manicure - Solange Miranda,35.00,entrada,servicos,pix
+2025-01-14,Pedicure - Solange Miranda,40.00,entrada,servicos,pix
+2025-01-15,Manutenção Ar Condicionado,280.00,saida,manutencao,pix
+2025-01-15,Corte Feminino - Gisele Pacheco,80.00,entrada,servicos,cartao
+2025-01-15,Coloração - Helena Barros,150.00,entrada,servicos,pix
+2025-01-15,Escova - Veronica Sales,50.00,entrada,servicos,cartao
+2025-01-15,Corte Masculino - Eduardo Bastos,45.00,entrada,servicos,dinheiro
+2025-01-16,Corte Feminino - Sabrina Leal,80.00,entrada,servicos,pix
+2025-01-16,Corte Feminino - Flavia Moraes,80.00,entrada,servicos,pix
+2025-01-16,Progressiva - Daiane Campos,250.00,entrada,servicos,cartao
+2025-01-16,Manicure - Aparecida Rocha,35.00,entrada,servicos,dinheiro
+2025-01-16,Design Sobrancelha - Luana Vieira,25.00,entrada,servicos,pix
+2025-01-17,Corte Feminino - Alessandra Mendes,80.00,entrada,servicos,cartao
+2025-01-17,Corte Masculino - Rafael Gomes,45.00,entrada,servicos,pix
+2025-01-17,Coloração - Tatiana Lima,150.00,entrada,servicos,cartao
+2025-01-17,Escova - Andreia Souza,50.00,entrada,servicos,pix
+2025-01-17,Pedicure - Edilene Costa,40.00,entrada,servicos,dinheiro
+2025-01-18,DAS MEI - Imposto,75.00,saida,impostos,boleto
+2025-01-18,Corte Feminino - Marcia Oliveira,80.00,entrada,servicos,pix
+2025-01-18,Corte Feminino - Eliana Santos,80.00,entrada,servicos,cartao
+2025-01-18,Progressiva - Sueli Ferreira,250.00,entrada,servicos,pix
+2025-01-18,Corte Masculino - Vinicius Dias,45.00,entrada,servicos,cartao
+2025-01-18,Manicure - Neuza Ribeiro,35.00,entrada,servicos,dinheiro
+2025-01-19,Corte Feminino - Ivone Alves,80.00,entrada,servicos,pix
+2025-01-19,Escova - Terezinha Martins,50.00,entrada,servicos,cartao
+2025-01-19,Coloração - Joana Pereira,150.00,entrada,servicos,pix
+2025-01-19,Design Sobrancelha - Catia Moura,25.00,entrada,servicos,dinheiro
