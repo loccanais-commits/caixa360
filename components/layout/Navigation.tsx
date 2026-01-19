@@ -53,14 +53,21 @@ export function Sidebar() {
                 <Link
                   href={item.href}
                   className={clsx(
-                    'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200',
+                    'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 relative',
                     isActive
-                      ? 'bg-primary-50 text-primary-700 font-medium'
+                      ? 'bg-primary-50 text-primary-700 font-medium shadow-sm'
                       : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
                   )}
                 >
+                  {/* Indicador visual de seção ativa */}
+                  {isActive && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary-500 rounded-r-full" />
+                  )}
                   <Icon className={clsx('w-5 h-5', isActive ? 'text-primary-600' : 'text-neutral-400')} />
                   <span>{item.label}</span>
+                  {isActive && (
+                    <div className="ml-auto w-2 h-2 bg-primary-500 rounded-full animate-pulse" />
+                  )}
                 </Link>
               </li>
             );

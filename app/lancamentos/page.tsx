@@ -296,6 +296,53 @@ export default function LancamentosPage() {
             {/* Filtros avançados */}
             {mostrarFiltros && (
               <div className="space-y-3 pt-4 border-t border-neutral-100">
+                {/* Atalhos de período */}
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: 'Hoje', getValue: () => {
+                      const hoje = new Date();
+                      const d = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+                      return { inicio: d, fim: d };
+                    }},
+                    { label: 'Esta semana', getValue: () => {
+                      const hoje = new Date();
+                      const inicioSemana = new Date(hoje);
+                      inicioSemana.setDate(hoje.getDate() - hoje.getDay());
+                      return {
+                        inicio: `${inicioSemana.getFullYear()}-${String(inicioSemana.getMonth() + 1).padStart(2, '0')}-${String(inicioSemana.getDate()).padStart(2, '0')}`,
+                        fim: `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`
+                      };
+                    }},
+                    { label: 'Este mês', getValue: () => {
+                      const hoje = new Date();
+                      const y = hoje.getFullYear();
+                      const m = String(hoje.getMonth() + 1).padStart(2, '0');
+                      const lastDay = new Date(y, hoje.getMonth() + 1, 0).getDate();
+                      return { inicio: `${y}-${m}-01`, fim: `${y}-${m}-${lastDay}` };
+                    }},
+                    { label: 'Mês passado', getValue: () => {
+                      const hoje = new Date();
+                      const mesPassado = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+                      const y = mesPassado.getFullYear();
+                      const m = String(mesPassado.getMonth() + 1).padStart(2, '0');
+                      const lastDay = new Date(y, mesPassado.getMonth() + 1, 0).getDate();
+                      return { inicio: `${y}-${m}-01`, fim: `${y}-${m}-${lastDay}` };
+                    }},
+                  ].map(({ label, getValue }) => (
+                    <button
+                      key={label}
+                      onClick={() => {
+                        const { inicio, fim } = getValue();
+                        setDataInicio(inicio);
+                        setDataFim(fim);
+                      }}
+                      className="px-3 py-1 text-xs rounded-full bg-neutral-100 text-neutral-600 hover:bg-primary-100 hover:text-primary-700 transition-colors"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
                 {/* Filtros de data */}
                 <div className="grid grid-cols-2 gap-3">
                   <Input

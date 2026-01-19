@@ -19,7 +19,7 @@ export function Button({
   disabled,
   ...props 
 }: ButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center gap-2 font-medium rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none';
+  const baseStyles = 'inline-flex items-center justify-center gap-2 font-medium rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2';
   
   const variants = {
     primary: 'bg-primary-500 text-white hover:bg-primary-600 hover:shadow-[0_7px_29px_rgba(6,182,212,0.5)] hover:tracking-wider active:transform active:translate-y-1',
@@ -55,11 +55,17 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   icon?: ReactNode;
 }
 
-export function Input({ label, error, icon, className, ...props }: InputProps) {
+export function Input({ label, error, icon, className, id, ...props }: InputProps) {
+  // Gerar ID único se não fornecido (para acessibilidade)
+  const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined);
+
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+        <label
+          htmlFor={inputId}
+          className="block text-sm font-medium text-neutral-700 mb-1.5"
+        >
           {label}
         </label>
       )}
@@ -70,6 +76,9 @@ export function Input({ label, error, icon, className, ...props }: InputProps) {
           </div>
         )}
         <input
+          id={inputId}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={error ? `${inputId}-error` : undefined}
           className={clsx(
             'w-full px-4 py-2.5 border border-neutral-200 rounded-xl text-neutral-900',
             'placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
@@ -81,7 +90,11 @@ export function Input({ label, error, icon, className, ...props }: InputProps) {
           {...props}
         />
       </div>
-      {error && <p className="mt-1 text-sm text-saida">{error}</p>}
+      {error && (
+        <p id={`${inputId}-error`} role="alert" className="mt-1 text-sm text-saida">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -94,15 +107,24 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   options: { value: string; label: string }[];
 }
 
-export function Select({ label, error, options, className, ...props }: SelectProps) {
+export function Select({ label, error, options, className, id, ...props }: SelectProps) {
+  // Gerar ID único se não fornecido (para acessibilidade)
+  const selectId = id || (label ? `select-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined);
+
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+        <label
+          htmlFor={selectId}
+          className="block text-sm font-medium text-neutral-700 mb-1.5"
+        >
           {label}
         </label>
       )}
       <select
+        id={selectId}
+        aria-invalid={error ? 'true' : undefined}
+        aria-describedby={error ? `${selectId}-error` : undefined}
         className={clsx(
           'w-full px-4 py-2.5 border border-neutral-200 rounded-xl text-neutral-900',
           'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
@@ -118,7 +140,11 @@ export function Select({ label, error, options, className, ...props }: SelectPro
           </option>
         ))}
       </select>
-      {error && <p className="mt-1 text-sm text-saida">{error}</p>}
+      {error && (
+        <p id={`${selectId}-error`} role="alert" className="mt-1 text-sm text-saida">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
