@@ -7,6 +7,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardHeader, CardTitle, Button, Select, Badge, Modal, Loading } from '@/components/ui';
 import { formatarMoeda, formatarDataCurta } from '@/lib/utils';
 import { TipoLancamento, Categoria, CATEGORIAS_BASE } from '@/lib/types';
+import { invalidateLancamentos } from '@/lib/hooks/useSWRHooks';
 import {
   Upload,
   FileSpreadsheet,
@@ -476,7 +477,12 @@ export default function ImportarPage() {
         data: linha.data,
       });
     }
-    
+
+    // Invalidar cache SWR para atualizar Dashboard e outras páginas
+    if (empresaId) {
+      invalidateLancamentos(empresaId);
+    }
+
     setImportados(selecionadas.length);
     setStep(4);
     setLoading(false);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { requireAuth } from '@/lib/auth-helpers';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 interface LancamentoExtraido {
   tipo: 'entrada' | 'saida';
@@ -317,6 +318,23 @@ export async function POST(request: NextRequest) {
     const auth = await requireAuth();
     if (auth.error) {
       return auth.error;
+    }
+
+    // Limite de 3 uploads por dia por usuário
+    const userId = auth.user.id;
+    const rateLimit = checkRateLimit(`import:${userId}`, {
+      maxRequests: 3,
+      windowMs: 24 * 60 * 60 * 1000 // 24 horas
+    });
+
+    if (!rateLimit.success) {
+      const horasRestantes = Math.ceil(rateLimit.resetIn / 3600);
+      return NextResponse.json({
+        error: 'Limite de importações atingido',
+        mensagem: `Você pode importar no máximo 3 arquivos por dia. Tente novamente em ${horasRestantes} hora(s).`,
+        resetIn: rateLimit.resetIn,
+        remaining: rateLimit.remaining
+      }, { status: 429 });
     }
 
     const formData = await request.formData();
