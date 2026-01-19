@@ -214,9 +214,15 @@ export function useDashboardData(empresaId: string | null) {
     empresaId ? `dashboard-${empresaId}` : null,
     async () => {
       const supabase = getSupabase();
-      const hoje = new Date().toISOString().split('T')[0];
-      const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-      const fimMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0];
+      // Usar formatação local para evitar bug de timezone (UTC vs local)
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+      const hoje = `${year}-${month}-${day}`;
+      const inicioMes = `${year}-${month}-01`;
+      const fimMes = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
       
       // Buscar tudo em paralelo
       const [

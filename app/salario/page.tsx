@@ -76,9 +76,9 @@ export default function SalarioPage() {
     setRetiradas(rets || []);
 
     // Calcular retirado no mês atual
-    const inicioMes = new Date();
-    inicioMes.setDate(1);
-    const inicioMesStr = inicioMes.toISOString().split('T')[0];
+    // Formatação local para evitar bug de timezone
+    const agora = new Date();
+    const inicioMesStr = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-01`;
     
     const retiradoMes = (rets || [])
       .filter(r => r.data >= inicioMesStr)
@@ -86,9 +86,10 @@ export default function SalarioPage() {
     setTotalRetiradoMes(retiradoMes);
 
     // Calcular médias dos últimos 3 meses
+    // Formatação local para evitar bug de timezone
     const ha3Meses = new Date();
     ha3Meses.setMonth(ha3Meses.getMonth() - 3);
-    const ha3MesesStr = ha3Meses.toISOString().split('T')[0];
+    const ha3MesesStr = `${ha3Meses.getFullYear()}-${String(ha3Meses.getMonth() + 1).padStart(2, '0')}-${String(ha3Meses.getDate()).padStart(2, '0')}`;
 
     const { data: lancamentos } = await supabase
       .from('lancamentos')

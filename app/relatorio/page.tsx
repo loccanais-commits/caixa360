@@ -168,22 +168,29 @@ export default function RelatorioPage() {
     setPeriodo(novoPeriodo);
     const hoje = new Date();
 
+    // Helper para formatar data local (evita bug de timezone com toISOString)
+    const formatDate = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
     switch (novoPeriodo) {
       case 'mes_atual':
-        setDataInicio(new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0]);
-        setDataFim(hoje.toISOString().split('T')[0]);
+        setDataInicio(`${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`);
+        setDataFim(formatDate(hoje));
         break;
       case 'mes_passado':
-        setDataInicio(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1).toISOString().split('T')[0]);
-        setDataFim(new Date(hoje.getFullYear(), hoje.getMonth(), 0).toISOString().split('T')[0]);
+        const mesPassado = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+        const fimMesPassado = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+        setDataInicio(`${mesPassado.getFullYear()}-${String(mesPassado.getMonth() + 1).padStart(2, '0')}-01`);
+        setDataFim(formatDate(fimMesPassado));
         break;
       case 'trimestre':
-        setDataInicio(new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1).toISOString().split('T')[0]);
-        setDataFim(hoje.toISOString().split('T')[0]);
+        const inicioTrimestre = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1);
+        setDataInicio(`${inicioTrimestre.getFullYear()}-${String(inicioTrimestre.getMonth() + 1).padStart(2, '0')}-01`);
+        setDataFim(formatDate(hoje));
         break;
       case 'ano':
-        setDataInicio(new Date(hoje.getFullYear(), 0, 1).toISOString().split('T')[0]);
-        setDataFim(hoje.toISOString().split('T')[0]);
+        setDataInicio(`${hoje.getFullYear()}-01-01`);
+        setDataFim(formatDate(hoje));
         break;
     }
   }

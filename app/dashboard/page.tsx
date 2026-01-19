@@ -134,8 +134,12 @@ export default function DashboardPage() {
       for (let i = 11; i >= 0; i--) {
         const mesData = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
         const mesNome = mesData.toLocaleDateString('pt-BR', { month: 'short' });
-        const inicioMes = mesData.toISOString().split('T')[0];
-        const fimMes = new Date(mesData.getFullYear(), mesData.getMonth() + 1, 0).toISOString().split('T')[0];
+        // Formatação local para evitar bug de timezone
+        const mesYear = mesData.getFullYear();
+        const mesMonth = String(mesData.getMonth() + 1).padStart(2, '0');
+        const mesLastDay = new Date(mesYear, mesData.getMonth() + 1, 0).getDate();
+        const inicioMes = `${mesYear}-${mesMonth}-01`;
+        const fimMes = `${mesYear}-${mesMonth}-${String(mesLastDay).padStart(2, '0')}`;
         
         const lancsMes = lancamentosOrdenados.filter((l: Lancamento) => l.data >= inicioMes && l.data <= fimMes);
         const entradasMes = lancsMes.filter((l: Lancamento) => l.tipo === 'entrada').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
@@ -153,7 +157,8 @@ export default function DashboardPage() {
       for (let i = diasParaVoltar - 1; i >= 0; i--) {
         const data = new Date(hoje);
         data.setDate(data.getDate() - i);
-        const dataStr = data.toISOString().split('T')[0];
+        // Formatação local para evitar bug de timezone
+        const dataStr = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`;
         
         const lancsDia = lancamentosOrdenados.filter((l: Lancamento) => l.data === dataStr);
         const entradasDia = lancsDia.filter((l: Lancamento) => l.tipo === 'entrada').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
@@ -197,8 +202,12 @@ export default function DashboardPage() {
     for (let i = 5; i >= 0; i--) {
       const mesData = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
       const mesNome = mesData.toLocaleDateString('pt-BR', { month: 'short' });
-      const inicioMes = mesData.toISOString().split('T')[0];
-      const fimMes = new Date(mesData.getFullYear(), mesData.getMonth() + 1, 0).toISOString().split('T')[0];
+      // Formatação local para evitar bug de timezone
+      const compYear = mesData.getFullYear();
+      const compMonth = String(mesData.getMonth() + 1).padStart(2, '0');
+      const compLastDay = new Date(compYear, mesData.getMonth() + 1, 0).getDate();
+      const inicioMes = `${compYear}-${compMonth}-01`;
+      const fimMes = `${compYear}-${compMonth}-${String(compLastDay).padStart(2, '0')}`;
       
       const lancsMes = todosLancamentos.filter((l: Lancamento) => l.data >= inicioMes && l.data <= fimMes);
       const entradas = lancsMes.filter((l: Lancamento) => l.tipo === 'entrada').reduce((a: number, l: Lancamento) => a + Number(l.valor), 0);
