@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth-helpers';
 
 export async function POST(request: NextRequest) {
   try {
+    // Verificar autenticação
+    const auth = await requireAuth();
+    if (auth.error) {
+      return auth.error;
+    }
+
     const { texto, fornecedores, categoriasPersonalizadas, produtos } = await request.json();
 
     if (!texto) {

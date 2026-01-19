@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth-helpers';
 
 // Esta API processa documentos enviados ao assistente
 // Para OCR real, seria necessário usar uma API como Google Vision, AWS Textract, etc.
@@ -6,10 +7,16 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
+    // Verificar autenticação
+    const auth = await requireAuth();
+    if (auth.error) {
+      return auth.error;
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const empresaId = formData.get('empresaId') as string;
-    
+
     if (!file) {
       return NextResponse.json({ error: 'Arquivo não fornecido' }, { status: 400 });
     }

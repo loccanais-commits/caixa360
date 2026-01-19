@@ -7,16 +7,47 @@ interface RateLimitEntry {
 }
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
+const MAX_STORE_SIZE = 10000;
 
-// Limpa entradas expiradas a cada 5 minutos
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitStore.entries()) {
-    if (entry.resetTime < now) {
-      rateLimitStore.delete(key);
+// Variável para controlar o intervalo de cleanup
+let cleanupInterval: NodeJS.Timeout | null = null;
+
+// Função para iniciar o cleanup
+function startCleanup() {
+  if (cleanupInterval) return;
+
+  cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of rateLimitStore.entries()) {
+      if (entry.resetTime < now) {
+        rateLimitStore.delete(key);
+      }
     }
+  }, 5 * 60 * 1000);
+}
+
+// Função para parar o cleanup (útil para testes)
+export function stopCleanup() {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
   }
-}, 5 * 60 * 1000);
+}
+
+// Função para limitar o tamanho do store
+function enforceStoreLimit() {
+  if (rateLimitStore.size > MAX_STORE_SIZE) {
+    // Remove as entradas mais antigas (menor resetTime)
+    const entries = Array.from(rateLimitStore.entries())
+      .sort((a, b) => a[1].resetTime - b[1].resetTime);
+
+    const toRemove = entries.slice(0, rateLimitStore.size - MAX_STORE_SIZE + 1000);
+    toRemove.forEach(([key]) => rateLimitStore.delete(key));
+  }
+}
+
+// Inicializa o cleanup apenas uma vez
+startCleanup();
 
 export interface RateLimitConfig {
   maxRequests: number;  // Número máximo de requisições
@@ -35,6 +66,9 @@ export function checkRateLimit(
 ): RateLimitResult {
   const now = Date.now();
   const key = identifier;
+
+  // Verificar e limitar tamanho do store
+  enforceStoreLimit();
 
   let entry = rateLimitStore.get(key);
 
@@ -72,18 +106,25 @@ export function checkRateLimit(
   };
 }
 
-// Obtém identificador único do request (IP + User Agent ou userId)
+// Obtém identificador único do request (userId preferencial)
 export function getRequestIdentifier(
   request: Request,
   userId?: string
 ): string {
+  // Prioriza userId para rate limiting mais preciso
   if (userId) {
     return `user:${userId}`;
   }
 
+  // Fallback para IP (menos confiável)
   const forwarded = request.headers.get('x-forwarded-for');
   const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown';
-  const userAgent = request.headers.get('user-agent') || 'unknown';
 
-  return `ip:${ip}:${userAgent.slice(0, 50)}`;
+  // Usar apenas IP para identificação (user-agent pode ser facilmente spoofado)
+  return `ip:${ip}`;
+}
+
+// Limpa o store (útil para testes)
+export function clearRateLimitStore() {
+  rateLimitStore.clear();
 }

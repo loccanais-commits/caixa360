@@ -74,10 +74,6 @@ export async function middleware(request: NextRequest) {
 
   // Para APIs protegidas, retorna 401
   if (!session && request.nextUrl.pathname.startsWith('/api')) {
-    // Exceção para API do assistente que faz validação própria
-    if (request.nextUrl.pathname === '/api/assistente') {
-      return response
-    }
     return NextResponse.json(
       { error: 'Não autorizado' },
       { status: 401 }

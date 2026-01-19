@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
+import { requireAuth } from '@/lib/auth-helpers';
 
 interface LancamentoExtraido {
   tipo: 'entrada' | 'saida';
@@ -268,13 +269,40 @@ function processTabularPlanilha(data: any[][]): LancamentoExtraido[] {
 
 export async function POST(request: NextRequest) {
   try {
+    // Verificar autenticação
+    const auth = await requireAuth();
+    if (auth.error) {
+      return auth.error;
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const mesReferencia = formData.get('mesReferencia') as string || new Date().toISOString().split('T')[0];
     const abaEscolhida = formData.get('aba') as string;
-    
+
     if (!file) {
       return NextResponse.json({ error: 'Arquivo não fornecido' }, { status: 400 });
+    }
+
+    // Validar tamanho (máx 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Arquivo muito grande. Máximo 10MB.' }, { status: 400 });
+    }
+
+    // Validar tipo de arquivo
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv'
+    ];
+    const fileName = file.name.toLowerCase();
+    const isValidType = allowedTypes.includes(file.type) ||
+                        fileName.endsWith('.xlsx') ||
+                        fileName.endsWith('.xls') ||
+                        fileName.endsWith('.csv');
+
+    if (!isValidType) {
+      return NextResponse.json({ error: 'Tipo de arquivo não permitido. Use Excel (.xlsx, .xls) ou CSV.' }, { status: 400 });
     }
 
     const buffer = await file.arrayBuffer();
