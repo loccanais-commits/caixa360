@@ -350,7 +350,17 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+
+    // Para arquivos CSV, garantir encoding UTF-8
+    let workbook;
+    if (fileName.endsWith('.csv')) {
+      // Converter buffer para string UTF-8
+      const decoder = new TextDecoder('utf-8');
+      const csvString = decoder.decode(buffer);
+      workbook = XLSX.read(csvString, { type: 'string', cellDates: true });
+    } else {
+      workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+    }
     
     // Retornar lista de abas se múltiplas e nenhuma escolhida
     if (!abaEscolhida && workbook.SheetNames.length > 1) {
