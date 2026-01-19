@@ -9,6 +9,7 @@ interface LancamentoExtraido {
   data: string;
   categoria?: string;
   secao?: string;
+  formaPagamento?: string;
 }
 
 // Função para extrair valor numérico de diversos formatos
@@ -208,12 +209,12 @@ function processOrcamentoPlanilha(data: any[][], mesRef: string): LancamentoExtr
   return lancamentos;
 }
 
-// Processa planilha tabular tradicional
+// Processa planilha tabular tradicional (CSV/Excel com colunas estruturadas)
 function processTabularPlanilha(data: any[][]): LancamentoExtraido[] {
   const lancamentos: LancamentoExtraido[] = [];
-  
   if (data.length < 2) return lancamentos;
-  
+
+  // Encontrar linha de header
   let headerRow = 0;
   for (let i = 0; i < Math.min(10, data.length); i++) {
     const row = data[i];
@@ -223,47 +224,90 @@ function processTabularPlanilha(data: any[][]): LancamentoExtraido[] {
       break;
     }
   }
-  
+
   const headers = (data[headerRow] || []).map((h: any) => String(h || '').toLowerCase().trim());
-  
-  let descCol = -1;
-  let valueCol = -1;
-  
+
+  // Mapear todas as colunas
+  let descCol = -1, valueCol = -1, tipoCol = -1, categoriaCol = -1, dataCol = -1, formaPagCol = -1;
+
   headers.forEach((h, i) => {
-    if (h.includes('descrição') || h.includes('descricao') || h.includes('nome') || h.includes('item')) descCol = i;
-    if (h.includes('valor') && valueCol === -1) valueCol = i;
+    if ((h.includes('descrição') || h.includes('descricao')) && descCol === -1) descCol = i;
+    if (h === 'valor' && valueCol === -1) valueCol = i;
+    if (h === 'tipo') tipoCol = i;
+    if (h === 'categoria' || h.includes('categoria')) categoriaCol = i;
+    if (h === 'data') dataCol = i;
+    if (h.includes('forma') || h.includes('pagamento')) formaPagCol = i;
   });
-  
-  if (descCol === -1) descCol = 0;
-  if (valueCol === -1) valueCol = 1;
-  
+
+  // Fallbacks para colunas não encontradas
+  if (descCol === -1) descCol = 1;
+  if (valueCol === -1) valueCol = 2;
+
   const hoje = new Date().toISOString().split('T')[0];
-  
+
   for (let i = headerRow + 1; i < data.length; i++) {
     const row = data[i];
     if (!row) continue;
-    
+
     const descricao = String(row[descCol] || '').trim();
     const valor = extractNumber(row[valueCol]);
-    
-    if (descricao && valor > 0 && descricao.length > 1) {
+
+    if (!descricao || valor <= 0 || descricao.length <= 1) continue;
+
+    // TIPO: usar coluna se existir, senão adivinhar pela descrição
+    let tipo: 'entrada' | 'saida' = 'saida';
+    if (tipoCol >= 0) {
+      const tipoValue = String(row[tipoCol] || '').toLowerCase().trim();
+      tipo = tipoValue === 'entrada' ? 'entrada' : 'saida';
+    } else {
       const descLower = descricao.toLowerCase();
-      let tipo: 'entrada' | 'saida' = 'saida';
-      
       if (descLower.includes('receb') || descLower.includes('venda') || descLower.includes('entrada')) {
         tipo = 'entrada';
       }
-      
-      lancamentos.push({
-        tipo,
-        descricao,
-        valor,
-        data: hoje,
-        categoria: tipo === 'entrada' ? 'outros_receitas' : 'outros_despesas'
-      });
     }
+
+    // CATEGORIA: usar coluna se existir
+    let categoria = tipo === 'entrada' ? 'outros_receitas' : 'outros_despesas';
+    if (categoriaCol >= 0) {
+      const catValue = String(row[categoriaCol] || '').trim();
+      if (catValue) categoria = catValue.toLowerCase().replace(/\s+/g, '_');
+    }
+
+    // DATA: usar coluna se existir
+    let dataLancamento = hoje;
+    if (dataCol >= 0) {
+      const dataValue = row[dataCol];
+      if (dataValue) {
+        if (dataValue instanceof Date) {
+          dataLancamento = dataValue.toISOString().split('T')[0];
+        } else {
+          const dataStr = String(dataValue).trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dataStr)) {
+            dataLancamento = dataStr;
+          } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)) {
+            const [d, m, y] = dataStr.split('/');
+            dataLancamento = `${y}-${m}-${d}`;
+          }
+        }
+      }
+    }
+
+    // FORMA PAGAMENTO: usar coluna se existir
+    let formaPagamento: string | undefined;
+    if (formaPagCol >= 0) {
+      formaPagamento = String(row[formaPagCol] || '').toLowerCase().trim() || undefined;
+    }
+
+    lancamentos.push({
+      tipo,
+      descricao,
+      valor,
+      data: dataLancamento,
+      categoria,
+      formaPagamento
+    });
   }
-  
+
   return lancamentos;
 }
 
